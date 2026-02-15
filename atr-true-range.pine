@@ -1,0 +1,49 @@
+//@version=6
+indicator("ATR + Candle Movement", overlay=false, precision=5)
+
+// -----------------------
+// Inputs (ATR-like config)
+// -----------------------
+len         = input.int(14, "Length", minval=1)
+rangeType   = input.string("High-Low", "Candle movement type", options=["High-Low", "True Range"])
+smoothType  = input.string("RMA (Wilder)", "Smoothing", options=["RMA (Wilder)", "SMA", "EMA", "WMA"])
+showRatio   = input.bool(false, "Show Candle/ATR ratio")
+showPercent = input.bool(false, "Show as % of price (uses close)")
+
+// -----------------------
+// Helpers
+// -----------------------
+f_smooth(x, l, method) =>
+    switch method
+        "SMA"          => ta.sma(x, l)
+        "EMA"          => ta.ema(x, l)
+        "WMA"          => ta.wma(x, l)
+        => ta.rma(x, l) // "RMA (Wilder)" default
+
+// -----------------------
+// Core series
+// -----------------------
+hlRange = high - low
+trRange = ta.tr(true)              // True Range per bar
+move    = rangeType == "True Range" ? trRange : hlRange
+
+atrRaw  = ta.tr(true)              // same TR series used by ATR
+atr     = f_smooth(atrRaw, len, smoothType)
+
+// Optional transforms
+denom   = showPercent ? close : 1.0
+moveOut = showPercent ? (move / denom) * 100.0 : move
+atrOut  = showPercent ? (atr  / denom) * 100.0 : atr
+
+ratio   = atr != 0 ? move / atr : na
+
+// -----------------------
+// Plots
+// -----------------------
+plot(atrOut,  "ATR", color=color.new(color.blue, 0), linewidth=2)
+plot(moveOut, "Candle movement", color=color.new(color.orange, 0), linewidth=2)
+
+plot(showRatio ? ratio : na, "Candle/ATR ratio", color=color.new(color.purple, 0), linewidth=2)
+
+hline(showPercent ? 0 : 0, "Zero", color=color.new(color.gray, 80))
+

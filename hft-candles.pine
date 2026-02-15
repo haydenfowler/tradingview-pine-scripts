@@ -1,0 +1,175 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+
+//@version=6
+indicator("HTF Candles", overlay=true)
+
+// USER SETTINGS
+
+higher_timeframe_input = input.string("Auto", title="Higher Timeframe",
+                                  options=["Auto", "1m", "5m", "15m", "30m", "1h", "4h", "D", "W", "M"],
+                                  tooltip="Select 'Auto' to automatically use one timeframe higher than the chart, or choose a specific timeframe")
+
+// Convert user-friendly labels to Pine Script timeframe format
+get_timeframe_string(input) =>
+    switch input
+        "1m" => "1"
+        "5m" => "5"
+        "15m" => "15"
+        "30m" => "30"
+        "1h" => "60"
+        "4h" => "240"
+        => input  // "Auto", "D", "W", "M" pass through unchanged
+
+get_next_higher_timeframe() =>
+    chart_tf = timeframe.in_seconds() / 60
+    result = switch
+        chart_tf < 1 => "1"
+        chart_tf < 5 => "5"
+        chart_tf < 15 => "15"
+        chart_tf < 30 => "30"
+        chart_tf < 60 => "60"
+        chart_tf < 240 => "240"
+        chart_tf < 1440 => "D"
+        chart_tf < 10080 => "W"
+        => "M"
+    result
+
+higher_timeframe = higher_timeframe_input == "Auto" ? get_next_higher_timeframe() : get_timeframe_string(higher_timeframe_input)
+
+bullish_fill_color = input.color(color.new(color.lime, 90), title="Bullish Fill Color")
+bullish_line_color = input.color(color.lime, title="Bullish Line Color")
+bearish_fill_color = input.color(color.new(color.red, 90), title="Bearish Fill Color")
+bearish_line_color = input.color(color.rgb(255,120,120), title="Bearish Line Color")
+line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
+line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dotted"])
+line_style = line_style_input == "Solid" ? line.style_solid : line.style_dotted
+
+// VARIABLES
+
+// Calculate how many chart bars fit in one HTF candle
+htf_seconds = timeframe.in_seconds(higher_timeframe)
+chart_seconds = timeframe.in_seconds()
+bars_per_htf = int(htf_seconds / chart_seconds)
+
+new_htf_candle_started = timeframe.change(higher_timeframe)
+
+var float current_htf_open_price = na
+var float current_htf_high_price = na
+var float current_htf_low_price = na
+var float current_htf_close_price = na
+var int htf_candle_start_bar = na
+
+var box visible_candle_body = na
+var line upper_shadow_line = na
+var line lower_shadow_line = na
+
+var color current_fill_color = na
+var color current_line_color = na
+
+// CANDLE RENDERING
+
+// Only render if chart timeframe is less than the higher timeframe
+htf_is_higher = chart_seconds < htf_seconds
+
+if htf_is_higher and new_htf_candle_started
+    current_htf_open_price := open
+    current_htf_high_price := high
+    current_htf_low_price := low
+    current_htf_close_price := close
+    htf_candle_start_bar := bar_index
+
+    is_bullish = current_htf_close_price >= current_htf_open_price
+    current_fill_color := is_bullish ? bullish_fill_color : bearish_fill_color
+    current_line_color := is_bullish ? bullish_line_color : bearish_line_color
+
+    // Extend box to where the HTF candle will end
+    expected_end_bar = bar_index + bars_per_htf - 1
+    visible_candle_body := box.new(
+         left=bar_index,
+         right=expected_end_bar,
+         top=math.max(current_htf_open_price, current_htf_close_price),
+         bottom=math.min(current_htf_open_price, current_htf_close_price),
+         bgcolor=current_fill_color,
+         border_color=current_line_color,
+         border_width=line_thickness,
+         border_style=line_style
+     )
+
+    // Wick centered in the expected HTF candle range
+    wick_pos = int(math.round((bar_index + expected_end_bar) / 2.0))
+    upper_shadow_line := line.new(
+         x1=wick_pos,
+         y1=math.max(current_htf_open_price, current_htf_close_price),
+         x2=wick_pos,
+         y2=current_htf_high_price,
+         color=current_line_color,
+         width=line_thickness,
+         style=line_style
+     )
+
+    lower_shadow_line := line.new(
+         x1=wick_pos,
+         y1=math.min(current_htf_open_price, current_htf_close_price),
+         x2=wick_pos,
+         y2=current_htf_low_price,
+         color=current_line_color,
+         width=line_thickness,
+         style=line_style
+     )
+
+else if htf_is_higher and not na(htf_candle_start_bar)
+    current_htf_high_price := math.max(current_htf_high_price, high)
+    current_htf_low_price := math.min(current_htf_low_price, low)
+    current_htf_close_price := close
+
+    is_bullish = current_htf_close_price >= current_htf_open_price
+    current_fill_color := is_bullish ? bullish_fill_color : bearish_fill_color
+    current_line_color := is_bullish ? bullish_line_color : bearish_line_color
+
+    if not na(visible_candle_body)
+        // Extend right to expected end of HTF candle or current bar, whichever is greater
+        expected_end_bar = htf_candle_start_bar + bars_per_htf - 1
+        box.set_right(visible_candle_body, math.max(bar_index, expected_end_bar))
+        box.set_top(visible_candle_body, math.max(current_htf_open_price, current_htf_close_price))
+        box.set_bottom(visible_candle_body, math.min(current_htf_open_price, current_htf_close_price))
+        box.set_bgcolor(visible_candle_body, current_fill_color)
+        box.set_border_color(visible_candle_body, current_line_color)
+
+    if not na(upper_shadow_line)
+        line.delete(upper_shadow_line)
+    if not na(lower_shadow_line)
+        line.delete(lower_shadow_line)
+
+    // Wick centered in the full HTF candle range
+    expected_end_bar_for_wick = htf_candle_start_bar + bars_per_htf - 1
+    wick_center = int(math.round((htf_candle_start_bar + expected_end_bar_for_wick) / 2.0))
+    tolerance = syminfo.mintick * 0.1
+
+    top_price = math.max(current_htf_open_price, current_htf_close_price)
+    bottom_price = math.min(current_htf_open_price, current_htf_close_price)
+
+    upper_wick_needed = (current_htf_high_price > top_price + tolerance)
+    lower_wick_needed = (current_htf_low_price < bottom_price - tolerance)
+
+    if upper_wick_needed
+        upper_shadow_line := line.new(
+             x1=wick_center,
+             y1=top_price,
+             x2=wick_center,
+             y2=current_htf_high_price,
+             color=current_line_color,
+             width=line_thickness,
+             style=line_style
+         )
+
+    if lower_wick_needed
+        lower_shadow_line := line.new(
+             x1=wick_center,
+             y1=bottom_price,
+             x2=wick_center,
+             y2=current_htf_low_price,
+             color=current_line_color,
+             width=line_thickness,
+             style=line_style
+         )
+
