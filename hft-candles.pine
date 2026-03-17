@@ -1,7 +1,7 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 
 //@version=6
-indicator("HTF Candles", overlay=true, explicit_plot_zorder=true, max_lines_count=500, max_boxes_count=500)
+indicator("HTF Candles", overlay=true, explicit_plot_zorder=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
 
 // USER SETTINGS
 
@@ -44,6 +44,10 @@ line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
 line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dotted"])
 line_style = line_style_input == "Solid" ? line.style_solid : line.style_dotted
 
+show_countdown = input.bool(true, title="Show Countdown Timer")
+countdown_color = input.color(color.white, title="Countdown Text Color")
+countdown_position_input = input.string("Middle", title="Countdown Position", options=["Top", "Middle", "Bottom"])
+
 // VARIABLES
 
 htf_seconds = timeframe.in_seconds(higher_timeframe)
@@ -65,6 +69,7 @@ var line lower_shadow_line = na
 
 var color current_fill_color = na
 var color current_line_color = na
+var label countdown_label = na
 
 // CANDLE RENDERING
 
@@ -94,7 +99,7 @@ if htf_is_higher and new_htf_candle_started
 
     // Extend box to where the HTF candle will end (use time-based estimate as fallback for first candle)
     bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
-    expected_end_bar = bar_index + bars_estimate - 1
+    expected_end_bar = math.min(bar_index + bars_estimate - 1, bar_index + 499)
     visible_candle_body := box.new(
          left=bar_index,
          right=expected_end_bar,
@@ -139,7 +144,7 @@ else if htf_is_higher and not na(htf_candle_start_bar)
 
     // Calculate expected end bar for box and wick positioning
     bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
-    expected_end_bar = htf_candle_start_bar + bars_estimate - 1
+    expected_end_bar = math.min(htf_candle_start_bar + bars_estimate - 1, bar_index + 499)
 
     if not na(visible_candle_body)
         box.set_right(visible_candle_body, math.max(bar_index, expected_end_bar))
@@ -180,3 +185,56 @@ else if htf_is_higher and not na(htf_candle_start_bar)
          style=line_style
      )
 
+// COUNTDOWN TIMER
+
+format_countdown(seconds) =>
+    int s = int(seconds)
+    int d = int(s / 86400)
+    int h = int((s % 86400) / 3600)
+    int m = int((s % 3600) / 60)
+    string result = ""
+    if d > 0
+        result += str.tostring(d) + "d"
+    if d > 0 or h > 0
+        result += str.tostring(h) + "h"
+    result += str.tostring(m) + "m"
+    result
+
+if htf_is_higher and show_countdown and barstate.islast and not na(htf_candle_start_bar)
+    // Calculate time remaining until HTF candle closes
+    int htf_open_time = int(math.round(time[bar_index - htf_candle_start_bar]))
+    int htf_close_time = htf_open_time + htf_seconds * 1000
+    int remaining_ms = htf_close_time - timenow
+    int remaining_s = int(math.max(0, remaining_ms / 1000))
+
+    countdown_text = format_countdown(remaining_s)
+
+    // Position label within the candle body
+    bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
+    expected_end_bar = htf_candle_start_bar + bars_estimate - 1
+    label_x = int(math.round((htf_candle_start_bar + math.max(bar_index, expected_end_bar)) / 2.0))
+
+    top_price = math.max(current_htf_open_price, current_htf_close_price)
+    bottom_price = math.min(current_htf_open_price, current_htf_close_price)
+    label_y = switch countdown_position_input
+        "Top" => top_price
+        "Bottom" => bottom_price
+        => (top_price + bottom_price) / 2
+
+    label_valign = switch countdown_position_input
+        "Top" => label.style_label_down
+        "Bottom" => label.style_label_up
+        => label.style_label_center
+
+    if not na(countdown_label)
+        label.delete(countdown_label)
+
+    countdown_label := label.new(
+         x=label_x,
+         y=label_y,
+         text=countdown_text,
+         color=color.new(color.black, 100),
+         textcolor=countdown_color,
+         style=label_valign,
+         size=size.normal
+     )
