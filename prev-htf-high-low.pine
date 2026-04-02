@@ -46,3 +46,28 @@ line_style = switch line_style_input
     "Dotted" => line.style_dotted
     "Dashed" => line.style_dashed
     => line.style_solid
+
+// DISPLAY COUNT
+// How many periods of the selected TF fit into the next-higher TF
+
+get_next_higher_for_tf(tf_seconds) =>
+    tf_minutes = tf_seconds / 60
+    result = switch
+        tf_minutes < 1 => "1"
+        tf_minutes < 5 => "5"
+        tf_minutes < 15 => "15"
+        tf_minutes < 30 => "30"
+        tf_minutes < 60 => "60"
+        tf_minutes < 240 => "240"
+        tf_minutes < 1440 => "D"
+        tf_minutes < 10080 => "W"
+        => "M"
+    result
+
+selected_tf_seconds = timeframe.in_seconds(selected_tf)
+next_higher_tf = get_next_higher_for_tf(selected_tf_seconds)
+next_higher_tf_seconds = timeframe.in_seconds(next_higher_tf)
+display_count = int(next_higher_tf_seconds / selected_tf_seconds)
+
+// GUARD — only render when chart TF is lower than selected TF
+chart_is_lower = timeframe.in_seconds() < selected_tf_seconds
