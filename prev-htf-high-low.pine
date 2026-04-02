@@ -71,3 +71,83 @@ display_count = int(next_higher_tf_seconds / selected_tf_seconds)
 
 // GUARD — only render when chart TF is lower than selected TF
 chart_is_lower = timeframe.in_seconds() < selected_tf_seconds
+
+// DATA
+
+[htf_high, htf_low] = request.security(syminfo.tickerid, selected_tf, [high, low])
+
+new_period = timeframe.change(selected_tf)
+
+// STORAGE
+
+var float[] prev_highs = array.new<float>()
+var float[] prev_lows = array.new<float>()
+var int[] period_start_bars = array.new<int>()
+var int[] period_end_bars = array.new<int>()
+var line[] high_lines = array.new<line>()
+var line[] low_lines = array.new<line>()
+
+var float completed_high = na
+var float completed_low = na
+var int current_period_start = na
+
+// PERIOD TRACKING
+
+if chart_is_lower
+    if new_period
+        // Store the just-completed period (if we have data)
+        if not na(completed_high) and not na(current_period_start)
+            // Cap array size — delete oldest if at limit
+            if array.size(prev_highs) >= display_count
+                array.shift(prev_highs)
+                array.shift(prev_lows)
+                array.shift(period_start_bars)
+                array.shift(period_end_bars)
+                old_h_line = array.shift(high_lines)
+                old_l_line = array.shift(low_lines)
+                line.delete(old_h_line)
+                line.delete(old_l_line)
+
+            array.push(prev_highs, completed_high)
+            array.push(prev_lows, completed_low)
+            array.push(period_start_bars, current_period_start)
+            array.push(period_end_bars, bar_index - 1)
+
+            // Create lines for this completed period
+            array.push(high_lines, line.new(x1=current_period_start, y1=completed_high,
+                                            x2=bar_index, y2=completed_high,
+                                            color=line_color_input, width=line_thickness_input, style=line_style))
+            array.push(low_lines, line.new(x1=current_period_start, y1=completed_low,
+                                           x2=bar_index, y2=completed_low,
+                                           color=line_color_input, width=line_thickness_input, style=line_style))
+
+            // Update the second-to-last entry's lines to extend into this period
+            entry_count = array.size(high_lines)
+            if entry_count >= 2
+                prev_h = array.get(high_lines, entry_count - 2)
+                prev_l = array.get(low_lines, entry_count - 2)
+                if not na(prev_h)
+                    line.set_x2(prev_h, bar_index - 1)
+                if not na(prev_l)
+                    line.set_x2(prev_l, bar_index - 1)
+
+        // Start tracking the new period
+        completed_high := htf_high
+        completed_low := htf_low
+        current_period_start := bar_index
+    else
+        // Update running high/low for current period
+        if not na(htf_high)
+            completed_high := htf_high
+        if not na(htf_low)
+            completed_low := htf_low
+
+    // Extend the most recent completed period's lines to current bar
+    n = array.size(high_lines)
+    if n > 0
+        last_h = array.get(high_lines, n - 1)
+        last_l = array.get(low_lines, n - 1)
+        if not na(last_h)
+            line.set_x2(last_h, bar_index)
+        if not na(last_l)
+            line.set_x2(last_l, bar_index)
