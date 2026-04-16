@@ -10,15 +10,15 @@ higher_timeframe_input = input.string("Auto", title="Higher Timeframe",
                                   tooltip="Select 'Auto' to automatically use one timeframe higher than the chart, or choose a specific timeframe")
 
 // Convert user-friendly labels to Pine Script timeframe format
-get_timeframe_string(input) =>
-    switch input
+get_timeframe_string(tf_input) =>
+    switch tf_input
         "1m" => "1"
         "5m" => "5"
         "15m" => "15"
         "30m" => "30"
         "1h" => "60"
         "4h" => "240"
-        => input  // "Auto", "D", "W", "M" pass through unchanged
+        => tf_input  // "Auto", "D", "W", "M" pass through unchanged
 
 get_next_higher_timeframe() =>
     chart_tf = timeframe.in_seconds() / 60
@@ -48,6 +48,9 @@ show_countdown = input.bool(true, title="Show Countdown Timer")
 countdown_color = input.color(color.white, title="Countdown Text Color")
 countdown_position_input = input.string("Middle", title="Countdown Position", options=["Top", "Middle", "Bottom"])
 
+hide_incomplete = input.bool(false, title="Hide candles extending beyond view",
+                             tooltip="Hides HTF candles whose close has not yet passed the right edge of the visible chart. Useful for manual backtesting by scrolling — prevents seeing future candle close prices.")
+
 // VARIABLES
 
 htf_seconds = timeframe.in_seconds(higher_timeframe)
@@ -71,6 +74,13 @@ var color current_fill_color = na
 var color current_line_color = na
 var label countdown_label = na
 
+// Arrays for tracking all HTF candle objects (used for dynamic hide/show based on viewport)
+var box[] all_htf_boxes = array.new<box>()
+var line[] all_htf_upper_wicks = array.new<line>()
+var line[] all_htf_lower_wicks = array.new<line>()
+var int[] all_htf_close_times = array.new<int>()  // ms; estimated for current candle, actual for completed
+var bool[] all_htf_is_bullish = array.new<bool>()
+
 // CANDLE RENDERING
 
 // Only render if chart timeframe is less than the higher timeframe
@@ -80,6 +90,14 @@ if htf_is_higher and new_htf_candle_started
     // Finalize the previous HTF candle's box - trim to actual end position
     if not na(visible_candle_body)
         box.set_right(visible_candle_body, bar_index - 1)
+
+        // Save the previous candle's final wick refs and actual close boundary in arrays
+        last_idx = array.size(all_htf_boxes) - 1
+        if last_idx >= 0
+            array.set(all_htf_upper_wicks, last_idx, upper_shadow_line)
+            array.set(all_htf_lower_wicks, last_idx, lower_shadow_line)
+            // Use the open time of the new bar as the close boundary for the previous candle
+            array.set(all_htf_close_times, last_idx, int(time))
 
     // Calculate actual bars in the previous HTF period (for markets with non-trading days)
     if not na(htf_candle_start_bar)
@@ -100,7 +118,7 @@ if htf_is_higher and new_htf_candle_started
     // Extend box to where the HTF candle will end (use time-based estimate as fallback for first candle)
     bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
     expected_end_bar = math.min(bar_index + bars_estimate - 1, bar_index + 499)
-    visible_candle_body := box.new(
+    new_box = box.new(
          left=bar_index,
          right=expected_end_bar,
          top=math.max(current_htf_open_price, current_htf_close_price),
@@ -110,6 +128,7 @@ if htf_is_higher and new_htf_candle_started
          border_width=line_thickness,
          border_style=line_style
      )
+    visible_candle_body := new_box
 
     // Wick centered in the expected HTF candle range
     wick_pos = int(math.round((bar_index + expected_end_bar) / 2.0))
@@ -132,6 +151,14 @@ if htf_is_higher and new_htf_candle_started
          width=line_thickness,
          style=line_style
      )
+
+    // Track new candle in arrays
+    estimated_close_time = int(time) + htf_seconds * 1000
+    array.push(all_htf_boxes, new_box)
+    array.push(all_htf_upper_wicks, upper_shadow_line)
+    array.push(all_htf_lower_wicks, lower_shadow_line)
+    array.push(all_htf_close_times, estimated_close_time)
+    array.push(all_htf_is_bullish, is_bullish)
 
 else if htf_is_higher and not na(htf_candle_start_bar)
     current_htf_high_price := math.max(current_htf_high_price, high)
@@ -184,6 +211,46 @@ else if htf_is_higher and not na(htf_candle_start_bar)
          width=line_thickness,
          style=line_style
      )
+
+    // Keep current candle's array entry up to date (wicks are deleted/recreated each bar)
+    last_idx = array.size(all_htf_boxes) - 1
+    if last_idx >= 0
+        array.set(all_htf_upper_wicks, last_idx, upper_shadow_line)
+        array.set(all_htf_lower_wicks, last_idx, lower_shadow_line)
+        array.set(all_htf_is_bullish, last_idx, is_bullish)
+        int htf_open_time = int(math.round(time[bar_index - htf_candle_start_bar]))
+        array.set(all_htf_close_times, last_idx, htf_open_time + htf_seconds * 1000)
+
+// HIDE/SHOW LOGIC
+//
+// chart.right_visible_bar_time updates as the user scrolls and triggers a recalc on barstate.islast.
+// On each recalc we iterate all tracked candles and hide any whose close time is beyond the right
+// edge of the visible chart. When hide_incomplete is off, all candles are restored to their colors.
+
+if htf_is_higher and barstate.islast
+    transparent = color.new(color.white, 100)
+    n = array.size(all_htf_boxes)
+    if n > 0
+        for i = 0 to n - 1
+            b = array.get(all_htf_boxes, i)
+            close_time = array.get(all_htf_close_times, i)
+            is_bull = array.get(all_htf_is_bullish, i)
+            u = array.get(all_htf_upper_wicks, i)
+            l = array.get(all_htf_lower_wicks, i)
+
+            should_hide = hide_incomplete and (not na(chart.right_visible_bar_time)) and (close_time > chart.right_visible_bar_time)
+
+            fill_c   = should_hide ? transparent : (is_bull ? bullish_fill_color : bearish_fill_color)
+            border_c = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
+            wick_c   = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
+
+            if not na(b)
+                box.set_bgcolor(b, fill_c)
+                box.set_border_color(b, border_c)
+            if not na(u)
+                line.set_color(u, wick_c)
+            if not na(l)
+                line.set_color(l, wick_c)
 
 // COUNTDOWN TIMER
 
