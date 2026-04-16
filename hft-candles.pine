@@ -276,10 +276,11 @@ if htf_is_higher and show_countdown and barstate.islast and not na(htf_candle_st
 
     countdown_text = format_countdown(remaining_s)
 
-    // Position label within the candle body
-    bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
-    expected_end_bar = htf_candle_start_bar + bars_estimate - 1
-    label_x = int(math.round((htf_candle_start_bar + math.max(bar_index, expected_end_bar)) / 2.0))
+    // Position label centered within the visible portion of the candle (time domain)
+    // Using xloc.bar_time avoids bar-index estimation errors from non-trading gaps
+    vis_left_time = math.max(htf_open_time, chart.left_visible_bar_time)
+    vis_right_time = math.min(htf_close_time, chart.right_visible_bar_time)
+    label_x = int(math.round((vis_left_time + vis_right_time) / 2.0))
 
     top_price = math.max(current_htf_open_price, current_htf_close_price)
     bottom_price = math.min(current_htf_open_price, current_htf_close_price)
@@ -298,6 +299,7 @@ if htf_is_higher and show_countdown and barstate.islast and not na(htf_candle_st
 
     countdown_label := label.new(
          x=label_x,
+         xloc=xloc.bar_time,
          y=label_y,
          text=countdown_text,
          color=color.new(color.black, 100),
