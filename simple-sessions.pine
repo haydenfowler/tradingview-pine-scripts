@@ -311,3 +311,48 @@ if not isJPSession and jpWasInSess
             line.delete(array.shift(jpLowLines))
 
 jpWasInSess := isJPSession
+
+// ─── EU/London Session High/Low Lines ─────────────────────────────────────────
+var float  euSessHigh     = na
+var float  euSessLow      = na
+var float  euSessOpen     = na
+var int    euSessStartBar = na
+var bool   euWasInSess    = false
+var line   euOpenLine     = na
+var line[] euHighLines    = array.new_line()
+var line[] euLowLines     = array.new_line()
+
+if isEUSession and not euWasInSess
+    euSessStartBar := bar_index
+    euSessOpen     := open
+    euSessHigh     := high
+    euSessLow      := low
+    if showSessionHiLo and showEUSession
+        if not na(euOpenLine)
+            line.delete(euOpenLine)
+        euOpenLine := line.new(bar_index, euSessOpen, bar_index + 1, euSessOpen,
+                               color=color.new(euSessionColor, 30), style=line.style_dotted,
+                               width=1, extend=extend.right)
+
+if isEUSession
+    euSessHigh := math.max(euSessHigh, high)
+    euSessLow  := math.min(euSessLow,  low)
+
+if not isEUSession and euWasInSess
+    if showSessionHiLo and showEUSession
+        if not na(euOpenLine)
+            line.delete(euOpenLine)
+            euOpenLine := na
+        _h = line.new(euSessStartBar, euSessHigh, bar_index, euSessHigh,
+                      color=color.new(euSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        _l = line.new(euSessStartBar, euSessLow, bar_index, euSessLow,
+                      color=color.new(euSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        array.push(euHighLines, _h)
+        array.push(euLowLines,  _l)
+        if array.size(euHighLines) > hiLoLookback
+            line.delete(array.shift(euHighLines))
+            line.delete(array.shift(euLowLines))
+
+euWasInSess := isEUSession
