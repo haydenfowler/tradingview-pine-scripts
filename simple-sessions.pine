@@ -401,3 +401,48 @@ if not isUSSession and usWasInSess
             line.delete(array.shift(usLowLines))
 
 usWasInSess := isUSSession
+
+// ─── Custom Session High/Low Lines ────────────────────────────────────────────
+var float  custSessHigh     = na
+var float  custSessLow      = na
+var float  custSessOpen     = na
+var int    custSessStartBar = na
+var bool   custWasInSess    = false
+var line   custOpenLine     = na
+var line[] custHighLines    = array.new_line()
+var line[] custLowLines     = array.new_line()
+
+if isCustomSession and not custWasInSess
+    custSessStartBar := bar_index
+    custSessOpen     := open
+    custSessHigh     := high
+    custSessLow      := low
+    if showSessionHiLo and showCustomSession
+        if not na(custOpenLine)
+            line.delete(custOpenLine)
+        custOpenLine := line.new(bar_index, custSessOpen, bar_index + 1, custSessOpen,
+                                 color=color.new(custSessionColor, 30), style=line.style_dotted,
+                                 width=1, extend=extend.right)
+
+if isCustomSession
+    custSessHigh := math.max(custSessHigh, high)
+    custSessLow  := math.min(custSessLow,  low)
+
+if not isCustomSession and custWasInSess
+    if showSessionHiLo and showCustomSession
+        if not na(custOpenLine)
+            line.delete(custOpenLine)
+            custOpenLine := na
+        _h = line.new(custSessStartBar, custSessHigh, bar_index, custSessHigh,
+                      color=color.new(custSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        _l = line.new(custSessStartBar, custSessLow, bar_index, custSessLow,
+                      color=color.new(custSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        array.push(custHighLines, _h)
+        array.push(custLowLines,  _l)
+        if array.size(custHighLines) > hiLoLookback
+            line.delete(array.shift(custHighLines))
+            line.delete(array.shift(custLowLines))
+
+custWasInSess := isCustomSession
