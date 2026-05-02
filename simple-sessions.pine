@@ -356,3 +356,48 @@ if not isEUSession and euWasInSess
             line.delete(array.shift(euLowLines))
 
 euWasInSess := isEUSession
+
+// ─── US/NY Session High/Low Lines ─────────────────────────────────────────────
+var float  usSessHigh     = na
+var float  usSessLow      = na
+var float  usSessOpen     = na
+var int    usSessStartBar = na
+var bool   usWasInSess    = false
+var line   usOpenLine     = na
+var line[] usHighLines    = array.new_line()
+var line[] usLowLines     = array.new_line()
+
+if isUSSession and not usWasInSess
+    usSessStartBar := bar_index
+    usSessOpen     := open
+    usSessHigh     := high
+    usSessLow      := low
+    if showSessionHiLo and showUSSession
+        if not na(usOpenLine)
+            line.delete(usOpenLine)
+        usOpenLine := line.new(bar_index, usSessOpen, bar_index + 1, usSessOpen,
+                               color=color.new(usSessionColor, 30), style=line.style_dotted,
+                               width=1, extend=extend.right)
+
+if isUSSession
+    usSessHigh := math.max(usSessHigh, high)
+    usSessLow  := math.min(usSessLow,  low)
+
+if not isUSSession and usWasInSess
+    if showSessionHiLo and showUSSession
+        if not na(usOpenLine)
+            line.delete(usOpenLine)
+            usOpenLine := na
+        _h = line.new(usSessStartBar, usSessHigh, bar_index, usSessHigh,
+                      color=color.new(usSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        _l = line.new(usSessStartBar, usSessLow, bar_index, usSessLow,
+                      color=color.new(usSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        array.push(usHighLines, _h)
+        array.push(usLowLines,  _l)
+        if array.size(usHighLines) > hiLoLookback
+            line.delete(array.shift(usHighLines))
+            line.delete(array.shift(usLowLines))
+
+usWasInSess := isUSSession
