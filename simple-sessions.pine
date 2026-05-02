@@ -1,0 +1,260 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © TheTrdFloor
+//
+// Over the years of working with people eager to learn the art and science of day-trading, one of the most common challenges
+// new traders struggle with is visualizing trading sessions for various parts of the world.  They generally get the idea of
+// what they are and how they work - the biggest struggle is really around the time-conversion elements.  
+//
+// Most people are pretty adept at understanding the session window for the session closest to them (e.g. EU residents can easily grasp the EU
+// (London/Frankfurt) sessions), but have a harder time translating foreign sessions (e.g. the US session) into their local time
+// easily and consistently.  While there are a plethora of "sessions indicators" in the wild here on TradingView, most of them
+// don't really solve this problem for users as they still require the user to do manual time-conversion to convert the sessions
+// into their local time and don't account for regional differences like daylight savings time shifts, as well as equatorial differences in seasons.  
+//
+// To help alleviate this issue (as well as automatically account for regional time shifts due to Daylight 
+// Savings Time), by building those session windows directly into this indicator (a.k.a. hard-coding) using the most commonly-accepted
+// trading time windows for each included region.  This is by no means ideal, but we feel it's a much-needed first-step to assist newcomers
+// with forex sessions.  
+//
+// As a final addition, we have also added a single user-customizable session that they can configure to also reference their local timezone.
+// We feel this adds a nice bit of additional freedom for people that are working a full-time job and want to dip into trading outside of work.
+// In this way, they can set the custom session to their personal available trading window to help with backtesting strategies that are likely
+// not tested to that degree of customization to help ensure that they remain profitable.
+//
+//@version=5
+indicator(title='Simple Sessions - [TTF]', shorttitle='Simple Sessions', overlay=true, max_labels_count=500, max_lines_count=200)
+
+///////////////////////////////////////////////
+// 
+//  Debugging/Troubleshooting Extras...
+//
+///////////////////////////////////////////////
+// 
+// This is very helpful when doing dev work on this as it will print a table showing some of the raw data/calculations on the chart,
+// but it's not needed for normal operation.  Therefore, we're commenting out the input and forcing debug-mode to be disabled...
+//
+// enableDebug = input.bool(defval=true, title="Enable Debug Mode", group="Debug")
+enableDebug = false
+//
+// Table for "debug logging" output...
+//
+t = table.new(position=position.top_right, columns=2, rows=25, frame_color=color.yellow, border_color=color.yellow, frame_width=3, border_width=2) 
+//
+if (enableDebug)
+    table.cell(t, column=0, row=0, text="syminfo.timezone", text_color=color.lime)
+    table.cell(t, column=1, row=0, text=syminfo.timezone, text_color=color.lime)
+    
+    table.cell(t, column=0, row=4, text="timeframe.isintraday", text_color=color.lime)
+    table.cell(t, column=1, row=4, text=str.tostring(timeframe.isintraday), text_color=color.lime)
+    
+    table.cell(t, column=0, row=5, text="bar time", text_color=color.lime)
+    table.cell(t, column=1, row=5, text=str.format("{0,date,MM-dd-YYYY HH:mm:ss (zz)}", time), text_color=color.lime)
+    
+//    
+//
+///////////////////////////////////////////////
+// 
+//  Standard/Main Code Starts Here...
+//
+///////////////////////////////////////////////
+
+/////////////////////////////////////////////
+//
+// First, let's handle our user input settings...  Each session will have 3 configs...
+//    1. A toggle to enable/disable the session display
+//    2. A color-picker to control the session fill color (since we can't use the Style tab for that)
+//    3. 2 session inputs to define the start and end time
+//
+showUSSession = input.bool(title="US (New York) Session", defval=true, group="US Session Display Settings", inline="us1")
+usSessionColor = input.color(title="", defval=color.rgb(229, 204, 255, 85), group="US Session Display Settings", inline="us1", tooltip="Check the box to " +
+             "enable the session highlight for the US session.\n\n" +
+             "If you wish to change the default session highlight color, you may do so here as well.")
+usSessInput = input.session(title="Local Time (America/New_York)", defval="0800-1600", group="US Session Display Settings")
+//
+showEUSession = input.bool(title="Europe (London) Session", defval=true, group="EU Session Display Settings", inline="eu")
+euSessionColor = input.color(title="", defval=color.rgb(204, 229, 255, 85), group="EU Session Display Settings", inline="eu", tooltip="Check the box to " +
+             "enable the session highlight for the EU session.\n\n" +
+             "If you wish to change the default session highlight color, you may do so here as well.")
+euSessInput = input.session(title="Local Time (Europe/London)", defval="0800-1700", group="EU Session Display Settings")
+//
+showMixedSession = input.bool(title="Mixed (US/Europe) Session", defval=true, group="EU/US Mixed Session Display Settings", inline="mix")
+mixedSessionColor = input.color(title="", defval=color.rgb(150, 150, 255,85), group="EU/US Mixed Session Display Settings", inline="mix", tooltip="Check the box to " +
+             "enable the session highlight for the US/EU Mixed session.\n\n" +
+             "If you wish to change the default session highlight color, you may do so here as well.\n\n" +
+             "Note: This session is the calculated overlap of the US and EU sessions above, so there is no custom time window for this session")
+//
+// Per feedback from testers, permanently hiding the AUS session...
+showAUSession = false
+auSessionColor = color.rgb(0, 0, 0, 100)
+auSessInput = "0000-0000"
+//showAUSession = input.bool(title="Australia (Sydney) Session", defval=false, group="AU Session Display Settings", inline="au")
+//auSessionColor = input.color(title="", defval=color.rgb(255, 150, 255,85), group="AU Session Display Settings", inline="au", tooltip="Check the box to " +
+//             "enable the session highlight for the Australia (Sydney) session.\n\n" +
+//             "If you wish to change the default session highlight color, you may do so here as well.")
+//auSessInput = input.session(title="Local Time (Australia/Sydney)", defval="0800-1600", group="AU Session Display Settings")
+//
+showJPSession = input.bool(title="Asia/Japan (Tokyo) Session", defval=true, group="JP Session Display Settings", inline="jp")
+jpSessionColor = input.color(title="", defval=color.rgb(255, 255, 204, 85), group="JP Session Display Settings", inline="jp", tooltip="Check the box to " +
+             "enable the session highlight for the Tokyo/Asia/Japan session.\n\n" +
+             "If you wish to change the default session highlight color, you may do so here as well.")
+jpSessInput = input.session(title="Local Time (Asia/Tokyo)", defval="0800-1600", group="JP Session Display Settings")
+//
+//
+//
+//  As an added bonus (and for more advanced users that have a personalized trading window), we'll also add in the ability for users to define their own "personal trading session"
+//
+showCustomSession = input.bool(title="User-Defined Custom Session", defval=false, group="User-Defined (Custom) Session", inline="cust")
+custSessionColor = input.color(title="", defval=color.rgb(125, 125, 125, 85), group="User-Defined (Custom) Session", inline="cust", tooltip="If checked, will display an additional session in the selected color.\n\n" +
+             "The settings for configuring this custom session are all below.")
+custSessionSession = input.session(defval="0800-1600", title="Custom Session Time Window", group="User-Defined (Custom) Session", tooltip="This setting is to define a custom time window/session along with the time zone setting below and the Session Days Of The Week above.")
+custSessTimezone = input.string(defval="Etc/UTC", title="Custom Session Timezone", 
+     options=["UTC", "America/Los_Angeles", "America/Phoenix", "America/Vancouver", "America/El_Salvador", "America/Bogota", "America/Chicago", "America/New_York", "America/Toronto", 
+             "America/Argentina/Buenos_Aires", "America/Sao_Paulo", "Etc/UTC", "GMT", "Europe/London", "Europe/Berlin", "Europe/Madrid", "Europe/Paris", "Europe/Warsaw", "Europe/Athens", 
+             "Europe/Moscow", "Asia/Tehran", "Asia/Dubai", "Asia/Ashkhabad", "Asia/Kolkata", "Asia/Almaty", "Asia/Bangkok", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Singapore", 
+             "Asia/Taipei", "Asia/Seoul", "Asia/Tokyo", "Australia/ACT", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney", "Pacific/Auckland", "Pacific/Fakaofo", "Pacific/Chatham", "Pacific/Honolulu"],
+	 group="User-Defined (Custom) Session", tooltip="This setting controls the reference timezone for the custom session window configured above.\n\n" +
+	         "If the time window above is configured for your personal timezone, then this should be your personal timezone as well.")
+//
+// Now that we have the custom session inputs, we need to create the proper custom session string with the DOW selections...
+//
+// ***  This block handles the session day-of-week selection *** //
+//
+incSun = input.bool(defval=false, title="Sunday", group="Session Days of the Week")
+incMon = input.bool(defval=true, title="Monday", group="Session Days of the Week")
+incTue = input.bool(defval=true, title="Tuesday", group="Session Days of the Week")
+incWed = input.bool(defval=true, title="Wednesday", group="Session Days of the Week")
+incThur = input.bool(defval=true, title="Thursday", group="Session Days of the Week")
+incFri = input.bool(defval=true, title="Friday", group="Session Days of the Week")
+incSat = input.bool(defval=false, title="Saturday", group="Session Days of the Week")
+//
+// *** This block converts the user-inputs above into the "days of the week" portion of a session string *** //
+//
+sessionDays = ""
+if (incSun)
+    sessionDays := sessionDays + "1"
+if (incMon)
+    sessionDays := sessionDays + "2"
+if (incTue)
+    sessionDays := sessionDays + "3"
+if (incWed)
+    sessionDays := sessionDays + "4"
+if (incThur)
+    sessionDays := sessionDays + "5"
+if (incFri)
+    sessionDays := sessionDays + "6"
+if (incSat)
+    sessionDays := sessionDays + "7"
+
+///////////////////////////////////////////////
+// 
+//
+// US Eastern (NY - America/New_York)
+//    
+usSession = usSessInput + ":" + sessionDays
+//
+if (enableDebug)
+    table.cell(t, column=0, row=7, text='usSession', text_color=color.lime)
+    table.cell(t, column=1, row=7, text=str.tostring(usSession), text_color=color.lime)
+
+  
+///////////////////////////////////////////////
+// 
+//
+// UK (London - Europe/London) - We're adding an hour to this to also cover the Frankfurt session
+// 
+euSession = euSessInput + ":" + sessionDays
+//
+if (enableDebug)
+    table.cell(t, column=0, row=8, text='euSession', text_color=color.lime)
+    table.cell(t, column=1, row=8, text=str.tostring(euSession), text_color=color.lime)
+
+///////////////////////////////////////////////
+// 
+//
+// AU (Sydney - Australia/Sydney)
+//
+auSession = auSessInput + ":" + sessionDays
+//
+if (enableDebug)
+    table.cell(t, column=0, row=9, text='auSession', text_color=color.lime)
+    table.cell(t, column=1, row=9, text=str.tostring(auSession), text_color=color.lime)
+
+
+///////////////////////////////////////////////
+// 
+//
+// JP (Tokyo - Asia/Tokyo) 
+//
+jpSession = jpSessInput + ":" + sessionDays
+//
+if (enableDebug)
+    table.cell(t, column=0, row=10, text='jpSession', text_color=color.lime)
+    table.cell(t, column=1, row=10, text=str.tostring(jpSession), text_color=color.lime)
+
+/////////////////////////////////////////////
+//
+// Now that we have our sessions defined, we can build some flag variables to easily tell
+// if the current bar time falls within our sessions...
+//
+// Start with a helper function to handle the logical evaluation...
+isInSession(session, ref_timezone) =>
+    ret = false
+    // The 'time' function will return 'na' if the test_time is not in the session window,
+    // and will return a Unix timestamp of the bar-time of test_time if it is, so we'll
+    // use the 'na' function to check if the time function returns "na" and effectively 
+    // "flip" the value (if the test-time returns "na" (not in session), the "na" function
+    // will return "true", and we instead want this function to return "false").
+    temp = time(timeframe.period, session, ref_timezone)
+    ret := na(temp) ? false : true
+    ret
+
+isUSSession = isInSession(usSession, "America/New_York")
+if (enableDebug)
+    table.cell(t, column=0, row=11, text='isUSSession', text_color=color.lime)
+    table.cell(t, column=1, row=11, text=str.tostring(isUSSession), text_color=color.lime)
+//
+isEUSession = isInSession(euSession, "Europe/London")
+if (enableDebug)
+    table.cell(t, column=0, row=12, text='isEUSession', text_color=color.lime)
+    table.cell(t, column=1, row=12, text=str.tostring(isEUSession), text_color=color.lime)
+//    
+isAUSession = isInSession(auSession, "Australia/Sydney")
+if (enableDebug)
+    table.cell(t, column=0, row=13, text='isAUSession', text_color=color.lime)
+    table.cell(t, column=1, row=13, text=str.tostring(isAUSession), text_color=color.lime)
+//
+isJPSession = isInSession(jpSession, "Asia/Tokyo")
+if (enableDebug)
+    table.cell(t, column=0, row=14, text='isJPSession', text_color=color.lime)
+    table.cell(t, column=1, row=14, text=str.tostring(isJPSession), text_color=color.lime)
+//
+isUSEUMixedSession = isUSSession and isEUSession ? true : false
+if (enableDebug)
+    table.cell(t, column=0, row=15, text='isUSEUMixedSession', text_color=color.lime)
+    table.cell(t, column=1, row=15, text=str.tostring(isUSEUMixedSession), text_color=color.lime)
+    
+custSession = custSessionSession + ":" + sessionDays
+if (enableDebug)
+    table.cell(t, column=0, row=16, text='custSession', text_color=color.lime)
+    table.cell(t, column=1, row=16, text=str.tostring(custSession), text_color=color.lime)
+    
+isCustomSession = isInSession(custSession, custSessTimezone)
+if (enableDebug)
+    table.cell(t, column=0, row=17, text='isCustomSession', text_color=color.lime)
+    table.cell(t, column=1, row=17, text=str.tostring(isCustomSession), text_color=color.lime)   
+
+//
+// Since we can't apply backgrounds inside a conditional like an 'if' block, we'll have
+// to use the 'color' arg and alter the transparency to 100 when it's not in that particular session.
+// 
+// To make this a bit easier, we'll define a 'null' color (black with 100% opacity). 
+nullColor = color.rgb(0, 0, 0, 100)    
+//
+bgcolor(title="US Session", color=showUSSession ? isUSSession ? usSessionColor : nullColor : nullColor, editable=false)
+bgcolor(title="EU Session", color=showEUSession ? isEUSession ? euSessionColor : nullColor : nullColor, editable=false)
+bgcolor(title="AU Session", color=showAUSession ? isAUSession ? auSessionColor : nullColor : nullColor, editable=false)
+bgcolor(title="JP Session", color=showJPSession ? isJPSession ? jpSessionColor : nullColor : nullColor, editable=false)
+// Since TV by default draws later objects on top of previous ones when there's an overlap, draw the mixed session last
+bgcolor(title="US/EU Mixed Session", color=showMixedSession ? isUSEUMixedSession ? mixedSessionColor : nullColor : nullColor, editable=false)
+// And our custom session last (see above for layer precedence)
+bgcolor(title="User-Defined Session", color=showCustomSession ? isCustomSession ? custSessionColor : nullColor : nullColor, editable=false)
