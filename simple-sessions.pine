@@ -115,6 +115,14 @@ custSessTimezone = input.string(defval="Etc/UTC", title="Custom Session Timezone
 	 group="User-Defined (Custom) Session", tooltip="This setting controls the reference timezone for the custom session window configured above.\n\n" +
 	         "If the time window above is configured for your personal timezone, then this should be your personal timezone as well.")
 //
+// High/Low line settings
+//
+showSessionHiLo = input.bool(title="Show Session High/Low Lines", defval=true, group="Session High/Low Settings",
+     tooltip="When enabled, draws dotted high and low lines for each closed session in the session's colour.\n\n" +
+             "During an active session, a dotted line is shown at the session open price instead.")
+hiLoLookback = input.int(title="Sessions to Display", defval=1, minval=1, maxval=10, group="Session High/Low Settings",
+     tooltip="Number of past closed sessions for which to display high/low lines.")
+//
 // Now that we have the custom session inputs, we need to create the proper custom session string with the DOW selections...
 //
 // ***  This block handles the session day-of-week selection *** //
