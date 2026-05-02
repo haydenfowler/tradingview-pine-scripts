@@ -266,3 +266,48 @@ bgcolor(title="JP Session", color=showJPSession ? isJPSession ? jpSessionColor :
 bgcolor(title="US/EU Mixed Session", color=showMixedSession ? isUSEUMixedSession ? mixedSessionColor : nullColor : nullColor, editable=false)
 // And our custom session last (see above for layer precedence)
 bgcolor(title="User-Defined Session", color=showCustomSession ? isCustomSession ? custSessionColor : nullColor : nullColor, editable=false)
+
+// ─── JP/Asia Session High/Low Lines ───────────────────────────────────────────
+var float  jpSessHigh     = na
+var float  jpSessLow      = na
+var float  jpSessOpen     = na
+var int    jpSessStartBar = na
+var bool   jpWasInSess    = false
+var line   jpOpenLine     = na
+var line[] jpHighLines    = array.new_line()
+var line[] jpLowLines     = array.new_line()
+
+if isJPSession and not jpWasInSess
+    jpSessStartBar := bar_index
+    jpSessOpen     := open
+    jpSessHigh     := high
+    jpSessLow      := low
+    if showSessionHiLo and showJPSession
+        if not na(jpOpenLine)
+            line.delete(jpOpenLine)
+        jpOpenLine := line.new(bar_index, jpSessOpen, bar_index + 1, jpSessOpen,
+                               color=color.new(jpSessionColor, 30), style=line.style_dotted,
+                               width=1, extend=extend.right)
+
+if isJPSession
+    jpSessHigh := math.max(jpSessHigh, high)
+    jpSessLow  := math.min(jpSessLow,  low)
+
+if not isJPSession and jpWasInSess
+    if showSessionHiLo and showJPSession
+        if not na(jpOpenLine)
+            line.delete(jpOpenLine)
+            jpOpenLine := na
+        _h = line.new(jpSessStartBar, jpSessHigh, bar_index, jpSessHigh,
+                      color=color.new(jpSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        _l = line.new(jpSessStartBar, jpSessLow, bar_index, jpSessLow,
+                      color=color.new(jpSessionColor, 30), style=line.style_dotted,
+                      width=1, extend=extend.right)
+        array.push(jpHighLines, _h)
+        array.push(jpLowLines,  _l)
+        if array.size(jpHighLines) > hiLoLookback
+            line.delete(array.shift(jpHighLines))
+            line.delete(array.shift(jpLowLines))
+
+jpWasInSess := isJPSession
