@@ -285,8 +285,8 @@ if isJPSession and not jpWasInSess
     if showSessionHiLo and showJPSession
         if not na(jpOpenLine)
             line.delete(jpOpenLine)
-        jpOpenLine := line.new(bar_index, jpSessOpen, bar_index + 1, jpSessOpen,
-                               color=color.new(jpSessionColor, 30), style=line.style_dotted,
+        jpOpenLine := line.new(bar_index, jpSessOpen, bar_index, jpSessOpen,
+                               color=jpSessionColor, style=line.style_dotted,
                                width=1, extend=extend.right)
 
 if isJPSession
@@ -299,10 +299,10 @@ if not isJPSession and jpWasInSess
             line.delete(jpOpenLine)
             jpOpenLine := na
         _h = line.new(jpSessStartBar, jpSessHigh, bar_index, jpSessHigh,
-                      color=color.new(jpSessionColor, 30), style=line.style_dotted,
+                      color=jpSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         _l = line.new(jpSessStartBar, jpSessLow, bar_index, jpSessLow,
-                      color=color.new(jpSessionColor, 30), style=line.style_dotted,
+                      color=jpSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         array.push(jpHighLines, _h)
         array.push(jpLowLines,  _l)
@@ -330,8 +330,8 @@ if isEUSession and not euWasInSess
     if showSessionHiLo and showEUSession
         if not na(euOpenLine)
             line.delete(euOpenLine)
-        euOpenLine := line.new(bar_index, euSessOpen, bar_index + 1, euSessOpen,
-                               color=color.new(euSessionColor, 30), style=line.style_dotted,
+        euOpenLine := line.new(bar_index, euSessOpen, bar_index, euSessOpen,
+                               color=euSessionColor, style=line.style_dotted,
                                width=1, extend=extend.right)
 
 if isEUSession
@@ -344,10 +344,10 @@ if not isEUSession and euWasInSess
             line.delete(euOpenLine)
             euOpenLine := na
         _h = line.new(euSessStartBar, euSessHigh, bar_index, euSessHigh,
-                      color=color.new(euSessionColor, 30), style=line.style_dotted,
+                      color=euSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         _l = line.new(euSessStartBar, euSessLow, bar_index, euSessLow,
-                      color=color.new(euSessionColor, 30), style=line.style_dotted,
+                      color=euSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         array.push(euHighLines, _h)
         array.push(euLowLines,  _l)
@@ -375,8 +375,8 @@ if isUSSession and not usWasInSess
     if showSessionHiLo and showUSSession
         if not na(usOpenLine)
             line.delete(usOpenLine)
-        usOpenLine := line.new(bar_index, usSessOpen, bar_index + 1, usSessOpen,
-                               color=color.new(usSessionColor, 30), style=line.style_dotted,
+        usOpenLine := line.new(bar_index, usSessOpen, bar_index, usSessOpen,
+                               color=usSessionColor, style=line.style_dotted,
                                width=1, extend=extend.right)
 
 if isUSSession
@@ -389,10 +389,10 @@ if not isUSSession and usWasInSess
             line.delete(usOpenLine)
             usOpenLine := na
         _h = line.new(usSessStartBar, usSessHigh, bar_index, usSessHigh,
-                      color=color.new(usSessionColor, 30), style=line.style_dotted,
+                      color=usSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         _l = line.new(usSessStartBar, usSessLow, bar_index, usSessLow,
-                      color=color.new(usSessionColor, 30), style=line.style_dotted,
+                      color=usSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         array.push(usHighLines, _h)
         array.push(usLowLines,  _l)
@@ -420,8 +420,8 @@ if isCustomSession and not custWasInSess
     if showSessionHiLo and showCustomSession
         if not na(custOpenLine)
             line.delete(custOpenLine)
-        custOpenLine := line.new(bar_index, custSessOpen, bar_index + 1, custSessOpen,
-                                 color=color.new(custSessionColor, 30), style=line.style_dotted,
+        custOpenLine := line.new(bar_index, custSessOpen, bar_index, custSessOpen,
+                                 color=custSessionColor, style=line.style_dotted,
                                  width=1, extend=extend.right)
 
 if isCustomSession
@@ -434,10 +434,10 @@ if not isCustomSession and custWasInSess
             line.delete(custOpenLine)
             custOpenLine := na
         _h = line.new(custSessStartBar, custSessHigh, bar_index, custSessHigh,
-                      color=color.new(custSessionColor, 30), style=line.style_dotted,
+                      color=custSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         _l = line.new(custSessStartBar, custSessLow, bar_index, custSessLow,
-                      color=color.new(custSessionColor, 30), style=line.style_dotted,
+                      color=custSessionColor, style=line.style_dotted,
                       width=1, extend=extend.right)
         array.push(custHighLines, _h)
         array.push(custLowLines,  _l)
