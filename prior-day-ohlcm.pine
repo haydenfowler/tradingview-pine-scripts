@@ -1,0 +1,12 @@
+//@version=6
+indicator(title="Previous Day OHLCM", shorttitle="D-1 OHLCM", overlay=true)
+active = input.bool(true, title="Show On Chart")
+
+[dHigh, dLow, dOpen, dClose] = request.security(syminfo.tickerid, 'D', [high[1], low[1], open[1], close[1]], lookahead=barmerge.lookahead_on)
+pricemid = (dHigh + dLow) / 2
+
+plot(active ? dHigh   : na, title="Previous Day High",  style=plot.style_stepline, linewidth=1, color=color.red)
+plot(active ? dLow    : na, title="Previous Day Low",   style=plot.style_stepline, linewidth=1, color=color.green)
+plot(active ? pricemid: na, title="Previous Day Mid",   style=plot.style_stepline, linewidth=1, color=color.blue)
+plot(active ? dOpen   : na, title="Previous Day Open",  style=plot.style_stepline, linewidth=1, color=color.purple)
+plot(active ? dClose  : na, title="Previous Day Close", style=plot.style_stepline, linewidth=1, color=color.black)

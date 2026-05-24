@@ -22,6 +22,30 @@ Plots ATR alongside per-candle movement to visualize volatility relative to the 
 - Optional candle/ATR ratio display
 - Option to show values as percentage of price
 
+### Previous Day OHLCM
+Displays the prior day's Open, High, Low, Close, and Midpoint as step lines on your chart.
+
+**Features:**
+- Shows all five prior-day levels (O, H, L, C, Mid) as persistent reference lines
+- Step line style for clean horizontal level display
+- Toggle visibility on/off
+
+### Previous HTF High/Low
+Plots the high and low of the previous completed bar on a higher timeframe as horizontal lines.
+
+**Features:**
+- Auto-selects the next higher timeframe, or choose manually
+- Configurable line color, thickness, and style (solid/dotted/dashed)
+
+### Simple Sessions
+Highlights global trading sessions (US, EU, Asia/Tokyo, and a user-defined session) as background fills on the chart.
+
+**Features:**
+- Toggle each session on/off with customizable fill colors
+- Accounts for daylight saving time across regions
+- Shows session high/low lines
+- Optional user-defined custom session with timezone support
+
 ## Installation
 
 1. Open TradingView and go to the Pine Script Editor
