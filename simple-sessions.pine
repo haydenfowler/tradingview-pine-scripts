@@ -1,448 +1,396 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © TheTrdFloor
-//
-// Over the years of working with people eager to learn the art and science of day-trading, one of the most common challenges
-// new traders struggle with is visualizing trading sessions for various parts of the world.  They generally get the idea of
-// what they are and how they work - the biggest struggle is really around the time-conversion elements.  
-//
-// Most people are pretty adept at understanding the session window for the session closest to them (e.g. EU residents can easily grasp the EU
-// (London/Frankfurt) sessions), but have a harder time translating foreign sessions (e.g. the US session) into their local time
-// easily and consistently.  While there are a plethora of "sessions indicators" in the wild here on TradingView, most of them
-// don't really solve this problem for users as they still require the user to do manual time-conversion to convert the sessions
-// into their local time and don't account for regional differences like daylight savings time shifts, as well as equatorial differences in seasons.  
-//
-// To help alleviate this issue (as well as automatically account for regional time shifts due to Daylight 
-// Savings Time), by building those session windows directly into this indicator (a.k.a. hard-coding) using the most commonly-accepted
-// trading time windows for each included region.  This is by no means ideal, but we feel it's a much-needed first-step to assist newcomers
-// with forex sessions.  
-//
-// As a final addition, we have also added a single user-customizable session that they can configure to also reference their local timezone.
-// We feel this adds a nice bit of additional freedom for people that are working a full-time job and want to dip into trading outside of work.
-// In this way, they can set the custom session to their personal available trading window to help with backtesting strategies that are likely
-// not tested to that degree of customization to help ensure that they remain profitable.
-//
-//@version=5
-indicator(title='Simple Sessions - [TTF]', shorttitle='Simple Sessions', overlay=true, max_labels_count=500, max_lines_count=200)
+//@version=6
+indicator(title='Simple Sessions', shorttitle='Simple Sessions', overlay=true, max_labels_count=500, max_lines_count=200)
 
-///////////////////////////////////////////////
-// 
-//  Debugging/Troubleshooting Extras...
-//
-///////////////////////////////////////////////
-// 
-// This is very helpful when doing dev work on this as it will print a table showing some of the raw data/calculations on the chart,
-// but it's not needed for normal operation.  Therefore, we're commenting out the input and forcing debug-mode to be disabled...
-//
-// enableDebug = input.bool(defval=true, title="Enable Debug Mode", group="Debug")
-enableDebug = false
-//
-// Table for "debug logging" output...
-//
-t = table.new(position=position.top_right, columns=2, rows=25, frame_color=color.yellow, border_color=color.yellow, frame_width=3, border_width=2) 
-//
-if (enableDebug)
-    table.cell(t, column=0, row=0, text="syminfo.timezone", text_color=color.lime)
-    table.cell(t, column=1, row=0, text=syminfo.timezone, text_color=color.lime)
-    
-    table.cell(t, column=0, row=4, text="timeframe.isintraday", text_color=color.lime)
-    table.cell(t, column=1, row=4, text=str.tostring(timeframe.isintraday), text_color=color.lime)
-    
-    table.cell(t, column=0, row=5, text="bar time", text_color=color.lime)
-    table.cell(t, column=1, row=5, text=str.format("{0,date,MM-dd-YYYY HH:mm:ss (zz)}", time), text_color=color.lime)
-    
-//    
-//
-///////////////////////////////////////////////
-// 
-//  Standard/Main Code Starts Here...
-//
-///////////////////////////////////////////////
+showUSSession   = input.bool(title="US (New York) Session", defval=true, group="US Session Display Settings", inline="us1", display=display.none)
+usSessionColor  = input.color(title="", defval=color.rgb(229, 204, 255, 85), group="US Session Display Settings", inline="us1", tooltip="Background highlight colour for the US session.", display=display.none)
+usLineColor     = input.color(title="Line", defval=color.rgb(160, 100, 240, 55), group="US Session Display Settings", inline="us1", tooltip="Colour for US session high/low lines.", display=display.none)
+usSessInput     = input.session(title="Local Time (America/New_York)", defval="0800-1600", group="US Session Display Settings", display=display.none)
 
-/////////////////////////////////////////////
-//
-// First, let's handle our user input settings...  Each session will have 3 configs...
-//    1. A toggle to enable/disable the session display
-//    2. A color-picker to control the session fill color (since we can't use the Style tab for that)
-//    3. 2 session inputs to define the start and end time
-//
-showUSSession = input.bool(title="US (New York) Session", defval=true, group="US Session Display Settings", inline="us1")
-usSessionColor = input.color(title="", defval=color.rgb(229, 204, 255, 85), group="US Session Display Settings", inline="us1", tooltip="Check the box to " +
-             "enable the session highlight for the US session.\n\n" +
-             "If you wish to change the default session highlight color, you may do so here as well.")
-usSessInput = input.session(title="Local Time (America/New_York)", defval="0800-1600", group="US Session Display Settings")
-//
-showEUSession = input.bool(title="Europe (London) Session", defval=true, group="EU Session Display Settings", inline="eu")
-euSessionColor = input.color(title="", defval=color.rgb(204, 229, 255, 85), group="EU Session Display Settings", inline="eu", tooltip="Check the box to " +
-             "enable the session highlight for the EU session.\n\n" +
-             "If you wish to change the default session highlight color, you may do so here as well.")
-euSessInput = input.session(title="Local Time (Europe/London)", defval="0800-1700", group="EU Session Display Settings")
-//
-showMixedSession = input.bool(title="Mixed (US/Europe) Session", defval=true, group="EU/US Mixed Session Display Settings", inline="mix")
-mixedSessionColor = input.color(title="", defval=color.rgb(150, 150, 255,85), group="EU/US Mixed Session Display Settings", inline="mix", tooltip="Check the box to " +
-             "enable the session highlight for the US/EU Mixed session.\n\n" +
-             "If you wish to change the default session highlight color, you may do so here as well.\n\n" +
-             "Note: This session is the calculated overlap of the US and EU sessions above, so there is no custom time window for this session")
-//
-// Per feedback from testers, permanently hiding the AUS session...
-showAUSession = false
+showEUSession   = input.bool(title="Europe (London) Session", defval=true, group="EU Session Display Settings", inline="eu", display=display.none)
+euSessionColor  = input.color(title="", defval=color.rgb(204, 229, 255, 85), group="EU Session Display Settings", inline="eu", tooltip="Background highlight colour for the EU session.", display=display.none)
+euLineColor     = input.color(title="Line", defval=color.rgb(80, 160, 240, 55), group="EU Session Display Settings", inline="eu", tooltip="Colour for EU session high/low lines.", display=display.none)
+euSessInput     = input.session(title="Local Time (Europe/London)", defval="0800-1700", group="EU Session Display Settings", display=display.none)
+
+showMixedSession  = input.bool(title="Mixed (US/Europe) Session", defval=false, group="EU/US Mixed Session Display Settings", inline="mix", display=display.none)
+mixedSessionColor = input.color(title="", defval=color.rgb(150, 150, 255, 85), group="EU/US Mixed Session Display Settings", inline="mix", tooltip="Background highlight colour for the US/EU overlap session.\n\nNote: This session is the calculated overlap of the US and EU sessions above, so there is no custom time window for this session.", display=display.none)
+
+showAUSession  = false
 auSessionColor = color.rgb(0, 0, 0, 100)
-auSessInput = "0000-0000"
-//showAUSession = input.bool(title="Australia (Sydney) Session", defval=false, group="AU Session Display Settings", inline="au")
-//auSessionColor = input.color(title="", defval=color.rgb(255, 150, 255,85), group="AU Session Display Settings", inline="au", tooltip="Check the box to " +
-//             "enable the session highlight for the Australia (Sydney) session.\n\n" +
-//             "If you wish to change the default session highlight color, you may do so here as well.")
-//auSessInput = input.session(title="Local Time (Australia/Sydney)", defval="0800-1600", group="AU Session Display Settings")
-//
-showJPSession = input.bool(title="Asia/Japan (Tokyo) Session", defval=true, group="JP Session Display Settings", inline="jp")
-jpSessionColor = input.color(title="", defval=color.rgb(255, 255, 204, 85), group="JP Session Display Settings", inline="jp", tooltip="Check the box to " +
-             "enable the session highlight for the Tokyo/Asia/Japan session.\n\n" +
-             "If you wish to change the default session highlight color, you may do so here as well.")
-jpSessInput = input.session(title="Local Time (Asia/Tokyo)", defval="0800-1600", group="JP Session Display Settings")
-//
-//
-//
-//  As an added bonus (and for more advanced users that have a personalized trading window), we'll also add in the ability for users to define their own "personal trading session"
-//
-showCustomSession = input.bool(title="User-Defined Custom Session", defval=false, group="User-Defined (Custom) Session", inline="cust")
-custSessionColor = input.color(title="", defval=color.rgb(125, 125, 125, 85), group="User-Defined (Custom) Session", inline="cust", tooltip="If checked, will display an additional session in the selected color.\n\n" +
-             "The settings for configuring this custom session are all below.")
-custSessionSession = input.session(defval="0800-1600", title="Custom Session Time Window", group="User-Defined (Custom) Session", tooltip="This setting is to define a custom time window/session along with the time zone setting below and the Session Days Of The Week above.")
-custSessTimezone = input.string(defval="Etc/UTC", title="Custom Session Timezone", 
-     options=["UTC", "America/Los_Angeles", "America/Phoenix", "America/Vancouver", "America/El_Salvador", "America/Bogota", "America/Chicago", "America/New_York", "America/Toronto", 
-             "America/Argentina/Buenos_Aires", "America/Sao_Paulo", "Etc/UTC", "GMT", "Europe/London", "Europe/Berlin", "Europe/Madrid", "Europe/Paris", "Europe/Warsaw", "Europe/Athens", 
-             "Europe/Moscow", "Asia/Tehran", "Asia/Dubai", "Asia/Ashkhabad", "Asia/Kolkata", "Asia/Almaty", "Asia/Bangkok", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Singapore", 
+auSessInput    = "0000-0000"
+
+showJPSession   = input.bool(title="Asia/Japan (Tokyo) Session", defval=true, group="JP Session Display Settings", inline="jp", display=display.none)
+jpSessionColor  = input.color(title="", defval=color.rgb(255, 255, 204, 75), group="JP Session Display Settings", inline="jp", tooltip="Background highlight colour for the Asia/Tokyo session.", display=display.none)
+jpLineColor     = input.color(title="Line", defval=color.rgb(220, 190, 30, 55), group="JP Session Display Settings", inline="jp", tooltip="Colour for Asia session high/low lines.", display=display.none)
+jpSessInput     = input.session(title="Local Time (Asia/Tokyo)", defval="0800-1600", group="JP Session Display Settings", display=display.none)
+
+showCustomSession   = input.bool(title="User-Defined Custom Session", defval=false, group="User-Defined (Custom) Session", inline="cust", display=display.none)
+custSessionColor    = input.color(title="", defval=color.rgb(125, 125, 125, 85), group="User-Defined (Custom) Session", inline="cust", tooltip="Background highlight colour for the custom session.", display=display.none)
+custLineColor       = input.color(title="Line", defval=color.rgb(150, 150, 150, 55), group="User-Defined (Custom) Session", inline="cust", tooltip="Colour for custom session high/low lines.", display=display.none)
+custSessionSession  = input.session(defval="0800-1600", title="Custom Session Time Window", group="User-Defined (Custom) Session", tooltip="Time window for the custom session.", display=display.none)
+custSessTimezone    = input.string(defval="Etc/UTC", title="Custom Session Timezone",
+     options=["UTC", "America/Los_Angeles", "America/Phoenix", "America/Vancouver", "America/El_Salvador", "America/Bogota", "America/Chicago", "America/New_York", "America/Toronto",
+             "America/Argentina/Buenos_Aires", "America/Sao_Paulo", "Etc/UTC", "GMT", "Europe/London", "Europe/Berlin", "Europe/Madrid", "Europe/Paris", "Europe/Warsaw", "Europe/Athens",
+             "Europe/Moscow", "Asia/Tehran", "Asia/Dubai", "Asia/Ashkhabad", "Asia/Kolkata", "Asia/Almaty", "Asia/Bangkok", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Singapore",
              "Asia/Taipei", "Asia/Seoul", "Asia/Tokyo", "Australia/ACT", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney", "Pacific/Auckland", "Pacific/Fakaofo", "Pacific/Chatham", "Pacific/Honolulu"],
-	 group="User-Defined (Custom) Session", tooltip="This setting controls the reference timezone for the custom session window configured above.\n\n" +
-	         "If the time window above is configured for your personal timezone, then this should be your personal timezone as well.")
-//
-// High/Low line settings
-//
+     group="User-Defined (Custom) Session", tooltip="Reference timezone for the custom session time window.", display=display.none)
+
 showSessionHiLo = input.bool(title="Show Session High/Low Lines", defval=true, group="Session High/Low Settings",
-     tooltip="When enabled, draws dotted high and low lines for each closed session in the session's colour.\n\n" +
-             "During an active session, a dotted line is shown at the session open price instead.")
-hiLoLookback = input.int(title="Sessions to Display", defval=1, minval=1, maxval=10, group="Session High/Low Settings",
-     tooltip="Number of past closed sessions for which to display high/low lines.")
-//
-// Now that we have the custom session inputs, we need to create the proper custom session string with the DOW selections...
-//
-// ***  This block handles the session day-of-week selection *** //
-//
-incSun = input.bool(defval=false, title="Sunday", group="Session Days of the Week")
-incMon = input.bool(defval=true, title="Monday", group="Session Days of the Week")
-incTue = input.bool(defval=true, title="Tuesday", group="Session Days of the Week")
-incWed = input.bool(defval=true, title="Wednesday", group="Session Days of the Week")
-incThur = input.bool(defval=true, title="Thursday", group="Session Days of the Week")
-incFri = input.bool(defval=true, title="Friday", group="Session Days of the Week")
-incSat = input.bool(defval=false, title="Saturday", group="Session Days of the Week")
-//
-// *** This block converts the user-inputs above into the "days of the week" portion of a session string *** //
-//
-sessionDays = ""
-if (incSun)
-    sessionDays := sessionDays + "1"
-if (incMon)
-    sessionDays := sessionDays + "2"
-if (incTue)
-    sessionDays := sessionDays + "3"
-if (incWed)
-    sessionDays := sessionDays + "4"
-if (incThur)
-    sessionDays := sessionDays + "5"
-if (incFri)
-    sessionDays := sessionDays + "6"
-if (incSat)
-    sessionDays := sessionDays + "7"
+     tooltip="Draws lines from the candle that made the session high/low, extending right until price invalidates that level.", display=display.none)
+hiLoLookback    = input.int(title="Sessions to Display", defval=1, minval=1, maxval=10, group="Session High/Low Settings",
+     tooltip="Number of past closed sessions for which to display high/low lines.", display=display.none)
+hiLoLineWidth   = input.int(title="Line Width", defval=1, minval=1, maxval=4, group="Session High/Low Settings", display=display.none)
+hiLoLineStyle   = input.string(title="Line Style", defval="Solid", options=["Solid", "Dashed", "Dotted"], group="Session High/Low Settings", display=display.none)
 
-///////////////////////////////////////////////
-// 
-//
-// US Eastern (NY - America/New_York)
-//    
-usSession = usSessInput + ":" + sessionDays
-//
-if (enableDebug)
-    table.cell(t, column=0, row=7, text='usSession', text_color=color.lime)
-    table.cell(t, column=1, row=7, text=str.tostring(usSession), text_color=color.lime)
+incSun  = input.bool(defval=false, title="Sunday",    group="Session Days of the Week", display=display.none)
+incMon  = input.bool(defval=true,  title="Monday",    group="Session Days of the Week", display=display.none)
+incTue  = input.bool(defval=true,  title="Tuesday",   group="Session Days of the Week", display=display.none)
+incWed  = input.bool(defval=true,  title="Wednesday", group="Session Days of the Week", display=display.none)
+incThur = input.bool(defval=true,  title="Thursday",  group="Session Days of the Week", display=display.none)
+incFri  = input.bool(defval=true,  title="Friday",    group="Session Days of the Week", display=display.none)
+incSat  = input.bool(defval=false, title="Saturday",  group="Session Days of the Week", display=display.none)
 
-  
-///////////////////////////////////////////////
-// 
-//
-// UK (London - Europe/London) - We're adding an hour to this to also cover the Frankfurt session
-// 
-euSession = euSessInput + ":" + sessionDays
-//
-if (enableDebug)
-    table.cell(t, column=0, row=8, text='euSession', text_color=color.lime)
-    table.cell(t, column=1, row=8, text=str.tostring(euSession), text_color=color.lime)
+sessionDays = (incSun ? "1" : "") + (incMon ? "2" : "") + (incTue ? "3" : "") + (incWed ? "4" : "") + (incThur ? "5" : "") + (incFri ? "6" : "") + (incSat ? "7" : "")
 
-///////////////////////////////////////////////
-// 
-//
-// AU (Sydney - Australia/Sydney)
-//
-auSession = auSessInput + ":" + sessionDays
-//
-if (enableDebug)
-    table.cell(t, column=0, row=9, text='auSession', text_color=color.lime)
-    table.cell(t, column=1, row=9, text=str.tostring(auSession), text_color=color.lime)
-
-
-///////////////////////////////////////////////
-// 
-//
-// JP (Tokyo - Asia/Tokyo) 
-//
-jpSession = jpSessInput + ":" + sessionDays
-//
-if (enableDebug)
-    table.cell(t, column=0, row=10, text='jpSession', text_color=color.lime)
-    table.cell(t, column=1, row=10, text=str.tostring(jpSession), text_color=color.lime)
-
-/////////////////////////////////////////////
-//
-// Now that we have our sessions defined, we can build some flag variables to easily tell
-// if the current bar time falls within our sessions...
-//
-// Start with a helper function to handle the logical evaluation...
-isInSession(session, ref_timezone) =>
-    ret = false
-    // The 'time' function will return 'na' if the test_time is not in the session window,
-    // and will return a Unix timestamp of the bar-time of test_time if it is, so we'll
-    // use the 'na' function to check if the time function returns "na" and effectively 
-    // "flip" the value (if the test-time returns "na" (not in session), the "na" function
-    // will return "true", and we instead want this function to return "false").
-    temp = time(timeframe.period, session, ref_timezone)
-    ret := na(temp) ? false : true
-    ret
-
-isUSSession = isInSession(usSession, "America/New_York")
-if (enableDebug)
-    table.cell(t, column=0, row=11, text='isUSSession', text_color=color.lime)
-    table.cell(t, column=1, row=11, text=str.tostring(isUSSession), text_color=color.lime)
-//
-isEUSession = isInSession(euSession, "Europe/London")
-if (enableDebug)
-    table.cell(t, column=0, row=12, text='isEUSession', text_color=color.lime)
-    table.cell(t, column=1, row=12, text=str.tostring(isEUSession), text_color=color.lime)
-//    
-isAUSession = isInSession(auSession, "Australia/Sydney")
-if (enableDebug)
-    table.cell(t, column=0, row=13, text='isAUSession', text_color=color.lime)
-    table.cell(t, column=1, row=13, text=str.tostring(isAUSession), text_color=color.lime)
-//
-isJPSession = isInSession(jpSession, "Asia/Tokyo")
-if (enableDebug)
-    table.cell(t, column=0, row=14, text='isJPSession', text_color=color.lime)
-    table.cell(t, column=1, row=14, text=str.tostring(isJPSession), text_color=color.lime)
-//
-isUSEUMixedSession = isUSSession and isEUSession ? true : false
-if (enableDebug)
-    table.cell(t, column=0, row=15, text='isUSEUMixedSession', text_color=color.lime)
-    table.cell(t, column=1, row=15, text=str.tostring(isUSEUMixedSession), text_color=color.lime)
-    
+usSession   = usSessInput        + ":" + sessionDays
+euSession   = euSessInput        + ":" + sessionDays
+auSession   = auSessInput        + ":" + sessionDays
+jpSession   = jpSessInput        + ":" + sessionDays
 custSession = custSessionSession + ":" + sessionDays
-if (enableDebug)
-    table.cell(t, column=0, row=16, text='custSession', text_color=color.lime)
-    table.cell(t, column=1, row=16, text=str.tostring(custSession), text_color=color.lime)
-    
-isCustomSession = isInSession(custSession, custSessTimezone)
-if (enableDebug)
-    table.cell(t, column=0, row=17, text='isCustomSession', text_color=color.lime)
-    table.cell(t, column=1, row=17, text=str.tostring(isCustomSession), text_color=color.lime)   
 
-//
-// Since we can't apply backgrounds inside a conditional like an 'if' block, we'll have
-// to use the 'color' arg and alter the transparency to 100 when it's not in that particular session.
-// 
-// To make this a bit easier, we'll define a 'null' color (black with 100% opacity). 
-nullColor = color.rgb(0, 0, 0, 100)    
-//
-bgcolor(title="US Session", color=showUSSession ? isUSSession ? usSessionColor : nullColor : nullColor, editable=false)
-bgcolor(title="EU Session", color=showEUSession ? isEUSession ? euSessionColor : nullColor : nullColor, editable=false)
-bgcolor(title="AU Session", color=showAUSession ? isAUSession ? auSessionColor : nullColor : nullColor, editable=false)
-bgcolor(title="JP Session", color=showJPSession ? isJPSession ? jpSessionColor : nullColor : nullColor, editable=false)
-// Since TV by default draws later objects on top of previous ones when there's an overlap, draw the mixed session last
+isInSession(simple string session, simple string ref_timezone) =>
+    na(time(timeframe.period, session, ref_timezone)) ? false : true
+
+isUSSession        = isInSession(usSession,   "America/New_York")
+isEUSession        = isInSession(euSession,   "Europe/London")
+isAUSession        = isInSession(auSession,   "Australia/Sydney")
+isJPSession        = isInSession(jpSession,   "Asia/Tokyo")
+isCustomSession    = isInSession(custSession, custSessTimezone)
+isUSEUMixedSession = isUSSession and isEUSession
+
+lineStyleVal = hiLoLineStyle == "Dashed" ? line.style_dashed : hiLoLineStyle == "Dotted" ? line.style_dotted : line.style_solid
+
+nullColor = color.rgb(0, 0, 0, 100)
+bgcolor(title="US Session",          color=showUSSession    ? isUSSession        ? usSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="EU Session",          color=showEUSession    ? isEUSession        ? euSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="AU Session",          color=showAUSession    ? isAUSession        ? auSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="JP Session",          color=showJPSession    ? isJPSession        ? jpSessionColor    : nullColor : nullColor, editable=false)
 bgcolor(title="US/EU Mixed Session", color=showMixedSession ? isUSEUMixedSession ? mixedSessionColor : nullColor : nullColor, editable=false)
-// And our custom session last (see above for layer precedence)
-bgcolor(title="User-Defined Session", color=showCustomSession ? isCustomSession ? custSessionColor : nullColor : nullColor, editable=false)
+bgcolor(title="User-Defined Session",color=showCustomSession? isCustomSession    ? custSessionColor  : nullColor : nullColor, editable=false)
 
 // ─── JP/Asia Session High/Low Lines ───────────────────────────────────────────
-var float  jpSessHigh     = na
-var float  jpSessLow      = na
-var float  jpSessOpen     = na
-var int    jpSessStartBar = na
-var bool   jpWasInSess    = false
-var line   jpOpenLine     = na
-var line[] jpHighLines    = array.new_line()
-var line[] jpLowLines     = array.new_line()
+var float   jpSessHigh    = na
+var float   jpSessLow     = na
+var float   jpSessOpen    = na
+var int     jpSessHighBar = na
+var int     jpSessLowBar  = na
+var bool    jpWasInSess   = false
+var line    jpOpenLine    = na
+var line[]  jpHighLines   = array.new_line()
+var line[]  jpLowLines    = array.new_line()
+var float[] jpHighLevels  = array.new_float()
+var float[] jpLowLevels   = array.new_float()
+var bool[]  jpHighDone    = array.new_bool()
+var bool[]  jpLowDone     = array.new_bool()
 
 if isJPSession and not jpWasInSess
-    jpSessStartBar := bar_index
-    jpSessOpen     := open
-    jpSessHigh     := high
-    jpSessLow      := low
+    jpSessHighBar := bar_index
+    jpSessLowBar  := bar_index
+    jpSessOpen    := open
+    jpSessHigh    := high
+    jpSessLow     := low
     if showSessionHiLo and showJPSession
         if not na(jpOpenLine)
             line.delete(jpOpenLine)
         jpOpenLine := line.new(bar_index, jpSessOpen, bar_index, jpSessOpen,
-                               color=jpSessionColor, style=line.style_dotted,
-                               width=1, extend=extend.right)
+                               color=jpLineColor, style=line.style_dashed,
+                               width=hiLoLineWidth, extend=extend.right)
 
 if isJPSession
-    jpSessHigh := math.max(jpSessHigh, high)
-    jpSessLow  := math.min(jpSessLow,  low)
+    if high > jpSessHigh
+        jpSessHigh    := high
+        jpSessHighBar := bar_index
+    if low < jpSessLow
+        jpSessLow    := low
+        jpSessLowBar := bar_index
 
 if not isJPSession and jpWasInSess
     if showSessionHiLo and showJPSession
         if not na(jpOpenLine)
             line.delete(jpOpenLine)
             jpOpenLine := na
-        _h = line.new(jpSessStartBar, jpSessHigh, bar_index, jpSessHigh,
-                      color=jpSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        _l = line.new(jpSessStartBar, jpSessLow, bar_index, jpSessLow,
-                      color=jpSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        array.push(jpHighLines, _h)
-        array.push(jpLowLines,  _l)
+        _h = line.new(jpSessHighBar, jpSessHigh, bar_index, jpSessHigh,
+                      color=jpLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        _l = line.new(jpSessLowBar,  jpSessLow,  bar_index, jpSessLow,
+                      color=jpLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        array.push(jpHighLines,  _h)
+        array.push(jpLowLines,   _l)
+        array.push(jpHighLevels, jpSessHigh)
+        array.push(jpLowLevels,  jpSessLow)
+        array.push(jpHighDone,   false)
+        array.push(jpLowDone,    false)
         if array.size(jpHighLines) > hiLoLookback
             line.delete(array.shift(jpHighLines))
             line.delete(array.shift(jpLowLines))
+            array.shift(jpHighLevels)
+            array.shift(jpLowLevels)
+            array.shift(jpHighDone)
+            array.shift(jpLowDone)
+
+if showSessionHiLo and showJPSession and array.size(jpHighLines) > 0
+    for i = 0 to array.size(jpHighLines) - 1
+        if not array.get(jpHighDone, i)
+            ln = array.get(jpHighLines, i)
+            if high >= array.get(jpHighLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(jpHighDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
+    for i = 0 to array.size(jpLowLines) - 1
+        if not array.get(jpLowDone, i)
+            ln = array.get(jpLowLines, i)
+            if low <= array.get(jpLowLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(jpLowDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
 
 jpWasInSess := isJPSession
 
 // ─── EU/London Session High/Low Lines ─────────────────────────────────────────
-var float  euSessHigh     = na
-var float  euSessLow      = na
-var float  euSessOpen     = na
-var int    euSessStartBar = na
-var bool   euWasInSess    = false
-var line   euOpenLine     = na
-var line[] euHighLines    = array.new_line()
-var line[] euLowLines     = array.new_line()
+var float   euSessHigh    = na
+var float   euSessLow     = na
+var float   euSessOpen    = na
+var int     euSessHighBar = na
+var int     euSessLowBar  = na
+var bool    euWasInSess   = false
+var line    euOpenLine    = na
+var line[]  euHighLines   = array.new_line()
+var line[]  euLowLines    = array.new_line()
+var float[] euHighLevels  = array.new_float()
+var float[] euLowLevels   = array.new_float()
+var bool[]  euHighDone    = array.new_bool()
+var bool[]  euLowDone     = array.new_bool()
 
 if isEUSession and not euWasInSess
-    euSessStartBar := bar_index
-    euSessOpen     := open
-    euSessHigh     := high
-    euSessLow      := low
+    euSessHighBar := bar_index
+    euSessLowBar  := bar_index
+    euSessOpen    := open
+    euSessHigh    := high
+    euSessLow     := low
     if showSessionHiLo and showEUSession
         if not na(euOpenLine)
             line.delete(euOpenLine)
         euOpenLine := line.new(bar_index, euSessOpen, bar_index, euSessOpen,
-                               color=euSessionColor, style=line.style_dotted,
-                               width=1, extend=extend.right)
+                               color=euLineColor, style=line.style_dashed,
+                               width=hiLoLineWidth, extend=extend.right)
 
 if isEUSession
-    euSessHigh := math.max(euSessHigh, high)
-    euSessLow  := math.min(euSessLow,  low)
+    if high > euSessHigh
+        euSessHigh    := high
+        euSessHighBar := bar_index
+    if low < euSessLow
+        euSessLow    := low
+        euSessLowBar := bar_index
 
 if not isEUSession and euWasInSess
     if showSessionHiLo and showEUSession
         if not na(euOpenLine)
             line.delete(euOpenLine)
             euOpenLine := na
-        _h = line.new(euSessStartBar, euSessHigh, bar_index, euSessHigh,
-                      color=euSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        _l = line.new(euSessStartBar, euSessLow, bar_index, euSessLow,
-                      color=euSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        array.push(euHighLines, _h)
-        array.push(euLowLines,  _l)
+        _h = line.new(euSessHighBar, euSessHigh, bar_index, euSessHigh,
+                      color=euLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        _l = line.new(euSessLowBar,  euSessLow,  bar_index, euSessLow,
+                      color=euLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        array.push(euHighLines,  _h)
+        array.push(euLowLines,   _l)
+        array.push(euHighLevels, euSessHigh)
+        array.push(euLowLevels,  euSessLow)
+        array.push(euHighDone,   false)
+        array.push(euLowDone,    false)
         if array.size(euHighLines) > hiLoLookback
             line.delete(array.shift(euHighLines))
             line.delete(array.shift(euLowLines))
+            array.shift(euHighLevels)
+            array.shift(euLowLevels)
+            array.shift(euHighDone)
+            array.shift(euLowDone)
+
+if showSessionHiLo and showEUSession and array.size(euHighLines) > 0
+    for i = 0 to array.size(euHighLines) - 1
+        if not array.get(euHighDone, i)
+            ln = array.get(euHighLines, i)
+            if high >= array.get(euHighLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(euHighDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
+    for i = 0 to array.size(euLowLines) - 1
+        if not array.get(euLowDone, i)
+            ln = array.get(euLowLines, i)
+            if low <= array.get(euLowLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(euLowDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
 
 euWasInSess := isEUSession
 
 // ─── US/NY Session High/Low Lines ─────────────────────────────────────────────
-var float  usSessHigh     = na
-var float  usSessLow      = na
-var float  usSessOpen     = na
-var int    usSessStartBar = na
-var bool   usWasInSess    = false
-var line   usOpenLine     = na
-var line[] usHighLines    = array.new_line()
-var line[] usLowLines     = array.new_line()
+var float   usSessHigh    = na
+var float   usSessLow     = na
+var float   usSessOpen    = na
+var int     usSessHighBar = na
+var int     usSessLowBar  = na
+var bool    usWasInSess   = false
+var line    usOpenLine    = na
+var line[]  usHighLines   = array.new_line()
+var line[]  usLowLines    = array.new_line()
+var float[] usHighLevels  = array.new_float()
+var float[] usLowLevels   = array.new_float()
+var bool[]  usHighDone    = array.new_bool()
+var bool[]  usLowDone     = array.new_bool()
 
 if isUSSession and not usWasInSess
-    usSessStartBar := bar_index
-    usSessOpen     := open
-    usSessHigh     := high
-    usSessLow      := low
+    usSessHighBar := bar_index
+    usSessLowBar  := bar_index
+    usSessOpen    := open
+    usSessHigh    := high
+    usSessLow     := low
     if showSessionHiLo and showUSSession
         if not na(usOpenLine)
             line.delete(usOpenLine)
         usOpenLine := line.new(bar_index, usSessOpen, bar_index, usSessOpen,
-                               color=usSessionColor, style=line.style_dotted,
-                               width=1, extend=extend.right)
+                               color=usLineColor, style=line.style_dashed,
+                               width=hiLoLineWidth, extend=extend.right)
 
 if isUSSession
-    usSessHigh := math.max(usSessHigh, high)
-    usSessLow  := math.min(usSessLow,  low)
+    if high > usSessHigh
+        usSessHigh    := high
+        usSessHighBar := bar_index
+    if low < usSessLow
+        usSessLow    := low
+        usSessLowBar := bar_index
 
 if not isUSSession and usWasInSess
     if showSessionHiLo and showUSSession
         if not na(usOpenLine)
             line.delete(usOpenLine)
             usOpenLine := na
-        _h = line.new(usSessStartBar, usSessHigh, bar_index, usSessHigh,
-                      color=usSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        _l = line.new(usSessStartBar, usSessLow, bar_index, usSessLow,
-                      color=usSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        array.push(usHighLines, _h)
-        array.push(usLowLines,  _l)
+        _h = line.new(usSessHighBar, usSessHigh, bar_index, usSessHigh,
+                      color=usLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        _l = line.new(usSessLowBar,  usSessLow,  bar_index, usSessLow,
+                      color=usLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        array.push(usHighLines,  _h)
+        array.push(usLowLines,   _l)
+        array.push(usHighLevels, usSessHigh)
+        array.push(usLowLevels,  usSessLow)
+        array.push(usHighDone,   false)
+        array.push(usLowDone,    false)
         if array.size(usHighLines) > hiLoLookback
             line.delete(array.shift(usHighLines))
             line.delete(array.shift(usLowLines))
+            array.shift(usHighLevels)
+            array.shift(usLowLevels)
+            array.shift(usHighDone)
+            array.shift(usLowDone)
+
+if showSessionHiLo and showUSSession and array.size(usHighLines) > 0
+    for i = 0 to array.size(usHighLines) - 1
+        if not array.get(usHighDone, i)
+            ln = array.get(usHighLines, i)
+            if high >= array.get(usHighLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(usHighDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
+    for i = 0 to array.size(usLowLines) - 1
+        if not array.get(usLowDone, i)
+            ln = array.get(usLowLines, i)
+            if low <= array.get(usLowLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(usLowDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
 
 usWasInSess := isUSSession
 
 // ─── Custom Session High/Low Lines ────────────────────────────────────────────
-var float  custSessHigh     = na
-var float  custSessLow      = na
-var float  custSessOpen     = na
-var int    custSessStartBar = na
-var bool   custWasInSess    = false
-var line   custOpenLine     = na
-var line[] custHighLines    = array.new_line()
-var line[] custLowLines     = array.new_line()
+var float   custSessHigh    = na
+var float   custSessLow     = na
+var float   custSessOpen    = na
+var int     custSessHighBar = na
+var int     custSessLowBar  = na
+var bool    custWasInSess   = false
+var line    custOpenLine    = na
+var line[]  custHighLines   = array.new_line()
+var line[]  custLowLines    = array.new_line()
+var float[] custHighLevels  = array.new_float()
+var float[] custLowLevels   = array.new_float()
+var bool[]  custHighDone    = array.new_bool()
+var bool[]  custLowDone     = array.new_bool()
 
 if isCustomSession and not custWasInSess
-    custSessStartBar := bar_index
-    custSessOpen     := open
-    custSessHigh     := high
-    custSessLow      := low
+    custSessHighBar := bar_index
+    custSessLowBar  := bar_index
+    custSessOpen    := open
+    custSessHigh    := high
+    custSessLow     := low
     if showSessionHiLo and showCustomSession
         if not na(custOpenLine)
             line.delete(custOpenLine)
         custOpenLine := line.new(bar_index, custSessOpen, bar_index, custSessOpen,
-                                 color=custSessionColor, style=line.style_dotted,
-                                 width=1, extend=extend.right)
+                                 color=custLineColor, style=line.style_dashed,
+                                 width=hiLoLineWidth, extend=extend.right)
 
 if isCustomSession
-    custSessHigh := math.max(custSessHigh, high)
-    custSessLow  := math.min(custSessLow,  low)
+    if high > custSessHigh
+        custSessHigh    := high
+        custSessHighBar := bar_index
+    if low < custSessLow
+        custSessLow    := low
+        custSessLowBar := bar_index
 
 if not isCustomSession and custWasInSess
     if showSessionHiLo and showCustomSession
         if not na(custOpenLine)
             line.delete(custOpenLine)
             custOpenLine := na
-        _h = line.new(custSessStartBar, custSessHigh, bar_index, custSessHigh,
-                      color=custSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        _l = line.new(custSessStartBar, custSessLow, bar_index, custSessLow,
-                      color=custSessionColor, style=line.style_dotted,
-                      width=1, extend=extend.right)
-        array.push(custHighLines, _h)
-        array.push(custLowLines,  _l)
+        _h = line.new(custSessHighBar, custSessHigh, bar_index, custSessHigh,
+                      color=custLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        _l = line.new(custSessLowBar,  custSessLow,  bar_index, custSessLow,
+                      color=custLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        array.push(custHighLines,  _h)
+        array.push(custLowLines,   _l)
+        array.push(custHighLevels, custSessHigh)
+        array.push(custLowLevels,  custSessLow)
+        array.push(custHighDone,   false)
+        array.push(custLowDone,    false)
         if array.size(custHighLines) > hiLoLookback
             line.delete(array.shift(custHighLines))
             line.delete(array.shift(custLowLines))
+            array.shift(custHighLevels)
+            array.shift(custLowLevels)
+            array.shift(custHighDone)
+            array.shift(custLowDone)
+
+if showSessionHiLo and showCustomSession and array.size(custHighLines) > 0
+    for i = 0 to array.size(custHighLines) - 1
+        if not array.get(custHighDone, i)
+            ln = array.get(custHighLines, i)
+            if high >= array.get(custHighLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(custHighDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
+    for i = 0 to array.size(custLowLines) - 1
+        if not array.get(custLowDone, i)
+            ln = array.get(custLowLines, i)
+            if low <= array.get(custLowLevels, i)
+                line.set_x2(ln, bar_index)
+                array.set(custLowDone, i, true)
+            else
+                line.set_x2(ln, bar_index)
 
 custWasInSess := isCustomSession
