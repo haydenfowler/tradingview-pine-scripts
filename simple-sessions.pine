@@ -60,7 +60,7 @@ jpSession   = jpSessInput        + ":" + sessionDays
 custSession = custSessionSession + ":" + sessionDays
 
 isInSession(simple string session, simple string ref_timezone) =>
-    na(time(timeframe.period, session, ref_timezone)) ? false : true
+    timeframe.isintraday and not na(time(timeframe.period, session, ref_timezone))
 
 isUSSession        = isInSession(usSession,   "America/New_York")
 isEUSession        = isInSession(euSession,   "Europe/London")
@@ -95,6 +95,15 @@ var bool[]  jpHighDone    = array.new_bool()
 var bool[]  jpLowDone     = array.new_bool()
 
 if isJPSession and not jpWasInSess
+    if showSessionHiLo and showJPSession and array.size(jpHighLines) > 0
+        for i = 0 to array.size(jpHighLines) - 1
+            if not array.get(jpHighDone, i)
+                line.set_x2(array.get(jpHighLines, i), bar_index)
+                array.set(jpHighDone, i, true)
+        for i = 0 to array.size(jpLowLines) - 1
+            if not array.get(jpLowDone, i)
+                line.set_x2(array.get(jpLowLines, i), bar_index)
+                array.set(jpLowDone, i, true)
     jpSessHighBar := bar_index
     jpSessLowBar  := bar_index
     jpSessOpen    := open
@@ -174,6 +183,15 @@ var bool[]  euHighDone    = array.new_bool()
 var bool[]  euLowDone     = array.new_bool()
 
 if isEUSession and not euWasInSess
+    if showSessionHiLo and showEUSession and array.size(euHighLines) > 0
+        for i = 0 to array.size(euHighLines) - 1
+            if not array.get(euHighDone, i)
+                line.set_x2(array.get(euHighLines, i), bar_index)
+                array.set(euHighDone, i, true)
+        for i = 0 to array.size(euLowLines) - 1
+            if not array.get(euLowDone, i)
+                line.set_x2(array.get(euLowLines, i), bar_index)
+                array.set(euLowDone, i, true)
     euSessHighBar := bar_index
     euSessLowBar  := bar_index
     euSessOpen    := open
@@ -253,6 +271,15 @@ var bool[]  usHighDone    = array.new_bool()
 var bool[]  usLowDone     = array.new_bool()
 
 if isUSSession and not usWasInSess
+    if showSessionHiLo and showUSSession and array.size(usHighLines) > 0
+        for i = 0 to array.size(usHighLines) - 1
+            if not array.get(usHighDone, i)
+                line.set_x2(array.get(usHighLines, i), bar_index)
+                array.set(usHighDone, i, true)
+        for i = 0 to array.size(usLowLines) - 1
+            if not array.get(usLowDone, i)
+                line.set_x2(array.get(usLowLines, i), bar_index)
+                array.set(usLowDone, i, true)
     usSessHighBar := bar_index
     usSessLowBar  := bar_index
     usSessOpen    := open
@@ -332,6 +359,15 @@ var bool[]  custHighDone    = array.new_bool()
 var bool[]  custLowDone     = array.new_bool()
 
 if isCustomSession and not custWasInSess
+    if showSessionHiLo and showCustomSession and array.size(custHighLines) > 0
+        for i = 0 to array.size(custHighLines) - 1
+            if not array.get(custHighDone, i)
+                line.set_x2(array.get(custHighLines, i), bar_index)
+                array.set(custHighDone, i, true)
+        for i = 0 to array.size(custLowLines) - 1
+            if not array.get(custLowDone, i)
+                line.set_x2(array.get(custLowLines, i), bar_index)
+                array.set(custLowDone, i, true)
     custSessHighBar := bar_index
     custSessLowBar  := bar_index
     custSessOpen    := open
