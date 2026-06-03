@@ -148,10 +148,12 @@ if isJPSession
 
 if not isJPSession and jpWasInSess
     if showCurrentSessHiLo and showJPSession
-        line.delete(jpCurrHighLine)
-        line.delete(jpCurrLowLine)
-        jpCurrHighLine := na
-        jpCurrLowLine  := na
+        if not na(jpCurrHighLine)
+            line.delete(jpCurrHighLine)
+            jpCurrHighLine := na
+        if not na(jpCurrLowLine)
+            line.delete(jpCurrLowLine)
+            jpCurrLowLine  := na
     if showSessionHiLo and showJPSession
         if not na(jpOpenLine)
             line.delete(jpOpenLine)
@@ -261,10 +263,12 @@ if isEUSession
 
 if not isEUSession and euWasInSess
     if showCurrentSessHiLo and showEUSession
-        line.delete(euCurrHighLine)
-        line.delete(euCurrLowLine)
-        euCurrHighLine := na
-        euCurrLowLine  := na
+        if not na(euCurrHighLine)
+            line.delete(euCurrHighLine)
+            euCurrHighLine := na
+        if not na(euCurrLowLine)
+            line.delete(euCurrLowLine)
+            euCurrLowLine  := na
     if showSessionHiLo and showEUSession
         if not na(euOpenLine)
             line.delete(euOpenLine)
@@ -374,10 +378,12 @@ if isUSSession
 
 if not isUSSession and usWasInSess
     if showCurrentSessHiLo and showUSSession
-        line.delete(usCurrHighLine)
-        line.delete(usCurrLowLine)
-        usCurrHighLine := na
-        usCurrLowLine  := na
+        if not na(usCurrHighLine)
+            line.delete(usCurrHighLine)
+            usCurrHighLine := na
+        if not na(usCurrLowLine)
+            line.delete(usCurrLowLine)
+            usCurrLowLine  := na
     if showSessionHiLo and showUSSession
         if not na(usOpenLine)
             line.delete(usOpenLine)
@@ -487,10 +493,12 @@ if isCustomSession
 
 if not isCustomSession and custWasInSess
     if showCurrentSessHiLo and showCustomSession
-        line.delete(custCurrHighLine)
-        line.delete(custCurrLowLine)
-        custCurrHighLine := na
-        custCurrLowLine  := na
+        if not na(custCurrHighLine)
+            line.delete(custCurrHighLine)
+            custCurrHighLine := na
+        if not na(custCurrLowLine)
+            line.delete(custCurrLowLine)
+            custCurrLowLine  := na
     if showSessionHiLo and showCustomSession
         if not na(custOpenLine)
             line.delete(custOpenLine)
