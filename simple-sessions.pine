@@ -138,10 +138,12 @@ if isJPSession
         jpSessLowBar := bar_index
     if showCurrentSessHiLo and showJPSession
         if not na(jpCurrHighLine)
+            line.set_x1(jpCurrHighLine, jpSessHighBar)
             line.set_x2(jpCurrHighLine, bar_index)
             line.set_y1(jpCurrHighLine, jpSessHigh)
             line.set_y2(jpCurrHighLine, jpSessHigh)
         if not na(jpCurrLowLine)
+            line.set_x1(jpCurrLowLine, jpSessLowBar)
             line.set_x2(jpCurrLowLine, bar_index)
             line.set_y1(jpCurrLowLine, jpSessLow)
             line.set_y2(jpCurrLowLine, jpSessLow)
@@ -253,10 +255,12 @@ if isEUSession
         euSessLowBar := bar_index
     if showCurrentSessHiLo and showEUSession
         if not na(euCurrHighLine)
+            line.set_x1(euCurrHighLine, euSessHighBar)
             line.set_x2(euCurrHighLine, bar_index)
             line.set_y1(euCurrHighLine, euSessHigh)
             line.set_y2(euCurrHighLine, euSessHigh)
         if not na(euCurrLowLine)
+            line.set_x1(euCurrLowLine, euSessLowBar)
             line.set_x2(euCurrLowLine, bar_index)
             line.set_y1(euCurrLowLine, euSessLow)
             line.set_y2(euCurrLowLine, euSessLow)
@@ -368,10 +372,12 @@ if isUSSession
         usSessLowBar := bar_index
     if showCurrentSessHiLo and showUSSession
         if not na(usCurrHighLine)
+            line.set_x1(usCurrHighLine, usSessHighBar)
             line.set_x2(usCurrHighLine, bar_index)
             line.set_y1(usCurrHighLine, usSessHigh)
             line.set_y2(usCurrHighLine, usSessHigh)
         if not na(usCurrLowLine)
+            line.set_x1(usCurrLowLine, usSessLowBar)
             line.set_x2(usCurrLowLine, bar_index)
             line.set_y1(usCurrLowLine, usSessLow)
             line.set_y2(usCurrLowLine, usSessLow)
@@ -483,10 +489,12 @@ if isCustomSession
         custSessLowBar := bar_index
     if showCurrentSessHiLo and showCustomSession
         if not na(custCurrHighLine)
+            line.set_x1(custCurrHighLine, custSessHighBar)
             line.set_x2(custCurrHighLine, bar_index)
             line.set_y1(custCurrHighLine, custSessHigh)
             line.set_y2(custCurrHighLine, custSessHigh)
         if not na(custCurrLowLine)
+            line.set_x1(custCurrLowLine, custSessLowBar)
             line.set_x2(custCurrLowLine, bar_index)
             line.set_y1(custCurrLowLine, custSessLow)
             line.set_y2(custCurrLowLine, custSessLow)
