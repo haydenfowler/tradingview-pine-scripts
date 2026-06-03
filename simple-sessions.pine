@@ -36,12 +36,14 @@ custSessTimezone    = input.string(defval="Etc/UTC", title="Custom Session Timez
              "Asia/Taipei", "Asia/Seoul", "Asia/Tokyo", "Australia/ACT", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney", "Pacific/Auckland", "Pacific/Fakaofo", "Pacific/Chatham", "Pacific/Honolulu"],
      group="User-Defined (Custom) Session", tooltip="Reference timezone for the custom session time window.", display=display.none)
 
-showSessionHiLo = input.bool(title="Show Session High/Low Lines", defval=true, group="Session High/Low Settings",
+showSessionHiLo     = input.bool(title="Show Session High/Low Lines", defval=true, group="Session High/Low Settings",
      tooltip="Draws lines from the candle that made the session high/low, extending right until price invalidates that level.", display=display.none)
-hiLoLookback    = input.int(title="Sessions to Display", defval=1, minval=1, maxval=10, group="Session High/Low Settings",
+showCurrentSessHiLo = input.bool(title="Show Current Session High/Low", defval=true, group="Session High/Low Settings",
+     tooltip="Draws live high/low lines for the session currently in progress. Lines are removed when the session closes.", display=display.none)
+hiLoLookback        = input.int(title="Sessions to Display", defval=1, minval=1, maxval=10, group="Session High/Low Settings",
      tooltip="Number of past closed sessions for which to display high/low lines.", display=display.none)
-hiLoLineWidth   = input.int(title="Line Width", defval=1, minval=1, maxval=4, group="Session High/Low Settings", display=display.none)
-hiLoLineStyle   = input.string(title="Line Style", defval="Solid", options=["Solid", "Dashed", "Dotted"], group="Session High/Low Settings", display=display.none)
+hiLoLineWidth       = input.int(title="Line Width", defval=1, minval=1, maxval=4, group="Session High/Low Settings", display=display.none)
+hiLoLineStyle       = input.string(title="Line Style", defval="Solid", options=["Solid", "Dashed", "Dotted"], group="Session High/Low Settings", display=display.none)
 
 incSun  = input.bool(defval=false, title="Sunday",    group="Session Days of the Week", display=display.none)
 incMon  = input.bool(defval=true,  title="Monday",    group="Session Days of the Week", display=display.none)
