@@ -82,14 +82,16 @@ bgcolor(title="US/EU Mixed Session", color=showMixedSession ? isUSEUMixedSession
 bgcolor(title="User-Defined Session",color=showCustomSession? isCustomSession    ? custSessionColor  : nullColor : nullColor, editable=false)
 
 // ─── JP/Asia Session High/Low Lines ───────────────────────────────────────────
-var float   jpSessHigh    = na
-var float   jpSessLow     = na
-var float   jpSessOpen    = na
-var int     jpSessHighBar = na
-var int     jpSessLowBar  = na
-var bool    jpWasInSess   = false
-var line    jpOpenLine    = na
-var line[]  jpHighLines   = array.new_line()
+var float   jpSessHigh     = na
+var float   jpSessLow      = na
+var float   jpSessOpen     = na
+var int     jpSessHighBar  = na
+var int     jpSessLowBar   = na
+var bool    jpWasInSess    = false
+var line    jpOpenLine     = na
+var line    jpCurrHighLine = na
+var line    jpCurrLowLine  = na
+var line[]  jpHighLines    = array.new_line()
 var line[]  jpLowLines    = array.new_line()
 var float[] jpHighLevels  = array.new_float()
 var float[] jpLowLevels   = array.new_float()
@@ -117,6 +119,15 @@ if isJPSession and not jpWasInSess
         jpOpenLine := line.new(bar_index, jpSessOpen, bar_index, jpSessOpen,
                                color=jpLineColor, style=line.style_dashed,
                                width=hiLoLineWidth, extend=extend.right)
+    if showCurrentSessHiLo and showJPSession
+        if not na(jpCurrHighLine)
+            line.delete(jpCurrHighLine)
+        if not na(jpCurrLowLine)
+            line.delete(jpCurrLowLine)
+        jpCurrHighLine := line.new(bar_index, jpSessHigh, bar_index, jpSessHigh,
+                                   color=jpLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        jpCurrLowLine  := line.new(bar_index, jpSessLow,  bar_index, jpSessLow,
+                                   color=jpLineColor, style=lineStyleVal, width=hiLoLineWidth)
 
 if isJPSession
     if high > jpSessHigh
@@ -125,8 +136,22 @@ if isJPSession
     if low < jpSessLow
         jpSessLow    := low
         jpSessLowBar := bar_index
+    if showCurrentSessHiLo and showJPSession
+        if not na(jpCurrHighLine)
+            line.set_x2(jpCurrHighLine, bar_index)
+            line.set_y1(jpCurrHighLine, jpSessHigh)
+            line.set_y2(jpCurrHighLine, jpSessHigh)
+        if not na(jpCurrLowLine)
+            line.set_x2(jpCurrLowLine, bar_index)
+            line.set_y1(jpCurrLowLine, jpSessLow)
+            line.set_y2(jpCurrLowLine, jpSessLow)
 
 if not isJPSession and jpWasInSess
+    if showCurrentSessHiLo and showJPSession
+        line.delete(jpCurrHighLine)
+        line.delete(jpCurrLowLine)
+        jpCurrHighLine := na
+        jpCurrLowLine  := na
     if showSessionHiLo and showJPSession
         if not na(jpOpenLine)
             line.delete(jpOpenLine)
