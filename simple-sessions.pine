@@ -195,14 +195,16 @@ if showSessionHiLo and showJPSession and array.size(jpHighLines) > 0
 jpWasInSess := isJPSession
 
 // ─── EU/London Session High/Low Lines ─────────────────────────────────────────
-var float   euSessHigh    = na
-var float   euSessLow     = na
-var float   euSessOpen    = na
-var int     euSessHighBar = na
-var int     euSessLowBar  = na
-var bool    euWasInSess   = false
-var line    euOpenLine    = na
-var line[]  euHighLines   = array.new_line()
+var float   euSessHigh     = na
+var float   euSessLow      = na
+var float   euSessOpen     = na
+var int     euSessHighBar  = na
+var int     euSessLowBar   = na
+var bool    euWasInSess    = false
+var line    euOpenLine     = na
+var line    euCurrHighLine = na
+var line    euCurrLowLine  = na
+var line[]  euHighLines    = array.new_line()
 var line[]  euLowLines    = array.new_line()
 var float[] euHighLevels  = array.new_float()
 var float[] euLowLevels   = array.new_float()
@@ -230,6 +232,15 @@ if isEUSession and not euWasInSess
         euOpenLine := line.new(bar_index, euSessOpen, bar_index, euSessOpen,
                                color=euLineColor, style=line.style_dashed,
                                width=hiLoLineWidth, extend=extend.right)
+    if showCurrentSessHiLo and showEUSession
+        if not na(euCurrHighLine)
+            line.delete(euCurrHighLine)
+        if not na(euCurrLowLine)
+            line.delete(euCurrLowLine)
+        euCurrHighLine := line.new(bar_index, euSessHigh, bar_index, euSessHigh,
+                                   color=euLineColor, style=lineStyleVal, width=hiLoLineWidth)
+        euCurrLowLine  := line.new(bar_index, euSessLow,  bar_index, euSessLow,
+                                   color=euLineColor, style=lineStyleVal, width=hiLoLineWidth)
 
 if isEUSession
     if high > euSessHigh
@@ -238,8 +249,22 @@ if isEUSession
     if low < euSessLow
         euSessLow    := low
         euSessLowBar := bar_index
+    if showCurrentSessHiLo and showEUSession
+        if not na(euCurrHighLine)
+            line.set_x2(euCurrHighLine, bar_index)
+            line.set_y1(euCurrHighLine, euSessHigh)
+            line.set_y2(euCurrHighLine, euSessHigh)
+        if not na(euCurrLowLine)
+            line.set_x2(euCurrLowLine, bar_index)
+            line.set_y1(euCurrLowLine, euSessLow)
+            line.set_y2(euCurrLowLine, euSessLow)
 
 if not isEUSession and euWasInSess
+    if showCurrentSessHiLo and showEUSession
+        line.delete(euCurrHighLine)
+        line.delete(euCurrLowLine)
+        euCurrHighLine := na
+        euCurrLowLine  := na
     if showSessionHiLo and showEUSession
         if not na(euOpenLine)
             line.delete(euOpenLine)
