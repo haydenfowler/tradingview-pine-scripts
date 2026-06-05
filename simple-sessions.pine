@@ -4,13 +4,15 @@
 indicator(title='Simple Sessions', shorttitle='Simple Sessions', overlay=true, max_labels_count=500, max_lines_count=200)
 
 showUSSession   = input.bool(title="US (New York) Session", defval=true, group="US Session Display Settings", inline="us1", display=display.none)
-usSessionColor  = input.color(title="", defval=color.rgb(229, 204, 255, 85), group="US Session Display Settings", inline="us1", tooltip="Background highlight colour for the US session.", display=display.none)
 usLineColor     = input.color(title="Line", defval=color.rgb(160, 100, 240, 55), group="US Session Display Settings", inline="us1", tooltip="Colour for US session high/low lines.", display=display.none)
+showUSBg        = input.bool(title="Background", defval=true, group="US Session Display Settings", inline="us2", display=display.none)
+usSessionColor  = input.color(title="", defval=color.rgb(229, 204, 255, 85), group="US Session Display Settings", inline="us2", tooltip="Background highlight colour for the US session.", display=display.none)
 usSessInput     = input.session(title="Local Time (America/New_York)", defval="0800-1600", group="US Session Display Settings", display=display.none)
 
-showEUSession   = input.bool(title="Europe (London) Session", defval=true, group="EU Session Display Settings", inline="eu", display=display.none)
-euSessionColor  = input.color(title="", defval=color.rgb(204, 229, 255, 85), group="EU Session Display Settings", inline="eu", tooltip="Background highlight colour for the EU session.", display=display.none)
-euLineColor     = input.color(title="Line", defval=color.rgb(80, 160, 240, 55), group="EU Session Display Settings", inline="eu", tooltip="Colour for EU session high/low lines.", display=display.none)
+showEUSession   = input.bool(title="Europe (London) Session", defval=true, group="EU Session Display Settings", inline="eu1", display=display.none)
+euLineColor     = input.color(title="Line", defval=color.rgb(80, 160, 240, 55), group="EU Session Display Settings", inline="eu1", tooltip="Colour for EU session high/low lines.", display=display.none)
+showEUBg        = input.bool(title="Background", defval=true, group="EU Session Display Settings", inline="eu2", display=display.none)
+euSessionColor  = input.color(title="", defval=color.rgb(204, 229, 255, 85), group="EU Session Display Settings", inline="eu2", tooltip="Background highlight colour for the EU session.", display=display.none)
 euSessInput     = input.session(title="Local Time (Europe/London)", defval="0800-1700", group="EU Session Display Settings", display=display.none)
 
 showMixedSession  = input.bool(title="Mixed (US/Europe) Session", defval=false, group="EU/US Mixed Session Display Settings", inline="mix", display=display.none)
@@ -20,14 +22,16 @@ showAUSession  = false
 auSessionColor = color.rgb(0, 0, 0, 100)
 auSessInput    = "0000-0000"
 
-showJPSession   = input.bool(title="Asia/Japan (Tokyo) Session", defval=true, group="JP Session Display Settings", inline="jp", display=display.none)
-jpSessionColor  = input.color(title="", defval=color.rgb(255, 255, 204, 75), group="JP Session Display Settings", inline="jp", tooltip="Background highlight colour for the Asia/Tokyo session.", display=display.none)
-jpLineColor     = input.color(title="Line", defval=color.rgb(220, 190, 30, 55), group="JP Session Display Settings", inline="jp", tooltip="Colour for Asia session high/low lines.", display=display.none)
+showJPSession   = input.bool(title="Asia/Japan (Tokyo) Session", defval=true, group="JP Session Display Settings", inline="jp1", display=display.none)
+jpLineColor     = input.color(title="Line", defval=color.rgb(220, 190, 30, 55), group="JP Session Display Settings", inline="jp1", tooltip="Colour for Asia session high/low lines.", display=display.none)
+showJPBg        = input.bool(title="Background", defval=true, group="JP Session Display Settings", inline="jp2", display=display.none)
+jpSessionColor  = input.color(title="", defval=color.rgb(255, 255, 204, 75), group="JP Session Display Settings", inline="jp2", tooltip="Background highlight colour for the Asia/Tokyo session.", display=display.none)
 jpSessInput     = input.session(title="Local Time (Asia/Tokyo)", defval="0800-1600", group="JP Session Display Settings", display=display.none)
 
-showCustomSession   = input.bool(title="User-Defined Custom Session", defval=false, group="User-Defined (Custom) Session", inline="cust", display=display.none)
-custSessionColor    = input.color(title="", defval=color.rgb(125, 125, 125, 85), group="User-Defined (Custom) Session", inline="cust", tooltip="Background highlight colour for the custom session.", display=display.none)
-custLineColor       = input.color(title="Line", defval=color.rgb(150, 150, 150, 55), group="User-Defined (Custom) Session", inline="cust", tooltip="Colour for custom session high/low lines.", display=display.none)
+showCustomSession   = input.bool(title="User-Defined Custom Session", defval=false, group="User-Defined (Custom) Session", inline="cust1", display=display.none)
+custLineColor       = input.color(title="Line", defval=color.rgb(150, 150, 150, 55), group="User-Defined (Custom) Session", inline="cust1", tooltip="Colour for custom session high/low lines.", display=display.none)
+showCustBg          = input.bool(title="Background", defval=true, group="User-Defined (Custom) Session", inline="cust2", display=display.none)
+custSessionColor    = input.color(title="", defval=color.rgb(125, 125, 125, 85), group="User-Defined (Custom) Session", inline="cust2", tooltip="Background highlight colour for the custom session.", display=display.none)
 custSessionSession  = input.session(defval="0800-1600", title="Custom Session Time Window", group="User-Defined (Custom) Session", tooltip="Time window for the custom session.", display=display.none)
 custSessTimezone    = input.string(defval="Etc/UTC", title="Custom Session Timezone",
      options=["UTC", "America/Los_Angeles", "America/Phoenix", "America/Vancouver", "America/El_Salvador", "America/Bogota", "America/Chicago", "America/New_York", "America/Toronto",
@@ -74,12 +78,12 @@ isUSEUMixedSession = isUSSession and isEUSession
 lineStyleVal = hiLoLineStyle == "Dashed" ? line.style_dashed : hiLoLineStyle == "Dotted" ? line.style_dotted : line.style_solid
 
 nullColor = color.rgb(0, 0, 0, 100)
-bgcolor(title="US Session",          color=showUSSession    ? isUSSession        ? usSessionColor    : nullColor : nullColor, editable=false)
-bgcolor(title="EU Session",          color=showEUSession    ? isEUSession        ? euSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="US Session",          color=showUSBg         ? isUSSession        ? usSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="EU Session",          color=showEUBg         ? isEUSession        ? euSessionColor    : nullColor : nullColor, editable=false)
 bgcolor(title="AU Session",          color=showAUSession    ? isAUSession        ? auSessionColor    : nullColor : nullColor, editable=false)
-bgcolor(title="JP Session",          color=showJPSession    ? isJPSession        ? jpSessionColor    : nullColor : nullColor, editable=false)
+bgcolor(title="JP Session",          color=showJPBg         ? isJPSession        ? jpSessionColor    : nullColor : nullColor, editable=false)
 bgcolor(title="US/EU Mixed Session", color=showMixedSession ? isUSEUMixedSession ? mixedSessionColor : nullColor : nullColor, editable=false)
-bgcolor(title="User-Defined Session",color=showCustomSession? isCustomSession    ? custSessionColor  : nullColor : nullColor, editable=false)
+bgcolor(title="User-Defined Session",color=showCustBg       ? isCustomSession    ? custSessionColor  : nullColor : nullColor, editable=false)
 
 // ─── JP/Asia Session High/Low Lines ───────────────────────────────────────────
 var float   jpSessHigh     = na
