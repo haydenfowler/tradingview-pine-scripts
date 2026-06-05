@@ -41,8 +41,8 @@ bullish_line_color = input.color(color.lime, title="Bullish Line Color")
 bearish_fill_color = input.color(color.new(color.red, 90), title="Bearish Fill Color")
 bearish_line_color = input.color(color.rgb(255,120,120), title="Bearish Line Color")
 line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
-line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dotted"])
-line_style = line_style_input == "Solid" ? line.style_solid : line.style_dotted
+line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"])
+line_style = line_style_input == "Solid" ? line.style_solid : line_style_input == "Dashed" ? line.style_dashed : line.style_dotted
 
 show_countdown = input.bool(true, title="Show Countdown Timer")
 countdown_color = input.color(color.white, title="Countdown Text Color")
