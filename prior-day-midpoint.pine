@@ -50,7 +50,16 @@ newDay = na(dayStart[1]) or dayStart != dayStart[1]
 
 // STORAGE — oldest at index 0, newest at the end
 
-var line[] midLines = array.new<line>()
+var line[]  midLines  = array.new<line>()
+var label[] midLabels = array.new<label>()
+
+// LABEL POSITION — a timestamp within the segment's day
+
+labelX = switch labelPosInput
+    "Left"   => dayStart
+    "Middle" => dayStart + int((dayEnd - dayStart) / 2)
+    "Right"  => dayEnd
+    => dayStart + int((dayEnd - dayStart) / 2)
 
 // DRAWING
 
@@ -59,6 +68,23 @@ if tfAllowed and newDay and not na(prevMid) and not na(dayStart) and not na(dayE
         oldLine = array.shift(midLines)
         if not na(oldLine)
             line.delete(oldLine)
+        if array.size(midLabels) > 0
+            oldLabel = array.shift(midLabels)
+            if not na(oldLabel)
+                label.delete(oldLabel)
 
     array.push(midLines, line.new(x1=dayStart, y1=prevMid, x2=dayEnd, y2=prevMid,
          xloc=xloc.bar_time, color=lineColorInput, width=lineWidthInput, style=lineStyle))
+
+    if showLabels
+        array.push(midLabels, label.new(x=labelX, y=prevMid, xloc=xloc.bar_time, yloc=yloc.price,
+             text="D-1 M", style=label.style_none, textcolor=labelColorInput, size=labelSize))
+
+    // Labels are relative to today, so every stored label is renamed as it ages.
+    // Newest is at the end of the array, so index i has age (labelCount - i).
+    labelCount = array.size(midLabels)
+    if labelCount > 0
+        for i = 0 to labelCount - 1
+            lb = array.get(midLabels, i)
+            if not na(lb)
+                label.set_text(lb, "D-" + str.tostring(labelCount - i) + " M")
