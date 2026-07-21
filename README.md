@@ -30,6 +30,17 @@ Displays the prior day's Open, High, Low, Close, and Midpoint as step lines on y
 - Step line style for clean horizontal level display
 - Toggle visibility on/off
 
+### Previous Day Midpoint
+Draws the prior day's midpoint — `(high + low) / 2` — as a labelled horizontal segment across each day, on any daily or intraday chart.
+
+**Features:**
+- One non-overlapping segment per day, each showing the previous day's midpoint
+- Today's segment is projected forward to the session close, ahead of price
+- Labels are relative to today (`D-1 M`, `D-2 M`, …) and renumber as days pass
+- Configurable number of days to display
+- Configurable line colour, width, and style (solid/dotted/dashed)
+- Configurable label visibility, position, colour, and size
+
 ### Previous HTF High/Low
 Plots the high and low of the previous completed bar on a higher timeframe as horizontal lines.
 
