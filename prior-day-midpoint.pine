@@ -1,0 +1,34 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+
+//@version=6
+indicator("Previous Day Midpoint", shorttitle="D-1 M", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// USER SETTINGS
+
+daysToShow = input.int(2, title="Number of Days to Display", minval=1, maxval=100,
+     tooltip="Number of midpoint segments to draw, including the segment covering today.")
+
+lineColorInput = input.color(#B0B0B0, title="Line Colour", group="Line")
+lineWidthInput = input.int(1, title="Line Width", minval=1, maxval=10, group="Line")
+lineStyleInput = input.string("Solid", title="Line Style", options=["Solid", "Dotted", "Dashed"], group="Line")
+
+showLabels      = input.bool(true, title="Show Labels", group="Label")
+labelPosInput   = input.string("Middle", title="Label Position", options=["Left", "Middle", "Right"], group="Label")
+labelColorInput = input.color(#B0B0B0, title="Label Colour", group="Label")
+labelSizeInput  = input.string("Small", title="Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Label")
+
+// STYLE MAPPING
+
+lineStyle = switch lineStyleInput
+    "Solid"  => line.style_solid
+    "Dotted" => line.style_dotted
+    "Dashed" => line.style_dashed
+    => line.style_solid
+
+labelSize = switch labelSizeInput
+    "Tiny"   => size.tiny
+    "Small"  => size.small
+    "Normal" => size.normal
+    "Large"  => size.large
+    "Huge"   => size.huge
+    => size.small
