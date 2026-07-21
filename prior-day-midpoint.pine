@@ -32,3 +32,33 @@ labelSize = switch labelSizeInput
     "Large"  => size.large
     "Huge"   => size.huge
     => size.small
+
+// TIMEFRAME GUARD — daily and below only
+
+tfAllowed = timeframe.in_seconds() <= 86400
+
+// DATA
+// high[1]/low[1] are the previous *completed* daily bar; time/time_close are the
+// current daily bar's open and close timestamps.
+
+[prevHigh, prevLow, dayStart, dayEnd] = request.security(syminfo.tickerid, "D",
+     [high[1], low[1], time, time_close], lookahead=barmerge.lookahead_on)
+
+prevMid = (prevHigh + prevLow) / 2
+
+newDay = na(dayStart[1]) or dayStart != dayStart[1]
+
+// STORAGE — oldest at index 0, newest at the end
+
+var line[] midLines = array.new<line>()
+
+// DRAWING
+
+if tfAllowed and newDay and not na(prevMid) and not na(dayStart) and not na(dayEnd)
+    if array.size(midLines) >= daysToShow
+        oldLine = array.shift(midLines)
+        if not na(oldLine)
+            line.delete(oldLine)
+
+    array.push(midLines, line.new(x1=dayStart, y1=prevMid, x2=dayEnd, y2=prevMid,
+         xloc=xloc.bar_time, color=lineColorInput, width=lineWidthInput, style=lineStyle))
