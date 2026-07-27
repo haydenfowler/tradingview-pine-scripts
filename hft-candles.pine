@@ -36,10 +36,12 @@ get_next_higher_timeframe() =>
 
 higher_timeframe = higher_timeframe_input == "Auto" ? get_next_higher_timeframe() : get_timeframe_string(higher_timeframe_input)
 
-bullish_fill_color = input.color(color.new(color.lime, 90), title="Bullish Fill Color")
-bullish_line_color = input.color(color.lime, title="Bullish Line Color")
-bearish_fill_color = input.color(color.new(color.red, 90), title="Bearish Fill Color")
-bearish_line_color = input.color(color.rgb(255,120,120), title="Bearish Line Color")
+// Pine takes transparency, TradingView's picker shows opacity — these are the
+// complements of 5% / 35% / 4% / 30% opacity respectively.
+bullish_fill_color = input.color(color.new(color.green, 95), title="Bullish Fill Color")
+bullish_line_color = input.color(color.new(color.green, 65), title="Bullish Line Color")
+bearish_fill_color = input.color(color.new(color.red, 96), title="Bearish Fill Color")
+bearish_line_color = input.color(color.new(color.rgb(255,120,120), 70), title="Bearish Line Color")
 line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
 line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"])
 line_style = line_style_input == "Solid" ? line.style_solid : line_style_input == "Dashed" ? line.style_dashed : line.style_dotted
@@ -58,13 +60,22 @@ chart_seconds = timeframe.in_seconds()
 
 new_htf_candle_started = timeframe.change(higher_timeframe)
 
+// True open/close timestamps of the HTF bar containing this chart bar. These are
+// session-aware: when a session ends part-way through an HTF period (e.g. a 4H
+// period on an 11-hour session) time_close returns the real, shortened close
+// rather than open + htf_seconds. Deriving the candle's width from these instead
+// of from a chart-bar count avoids assuming every HTF period holds the same
+// number of chart bars — an assumption 4H breaks on most session-based symbols.
+htf_open_time = time(higher_timeframe)
+htf_close_time = time_close(higher_timeframe)
+
+// Midpoint of the HTF period, used to centre the wick.
+htf_mid_time = htf_open_time + int((htf_close_time - htf_open_time) / 2)
+
 var float current_htf_open_price = na
 var float current_htf_high_price = na
 var float current_htf_low_price = na
 var float current_htf_close_price = na
-var int htf_candle_start_bar = na
-var int prev_htf_candle_start_bar = na
-var int bars_per_htf = na  // Will be set from actual observed data
 
 var box visible_candle_body = na
 var line upper_shadow_line = na
@@ -78,7 +89,7 @@ var label countdown_label = na
 var box[] all_htf_boxes = array.new<box>()
 var line[] all_htf_upper_wicks = array.new<line>()
 var line[] all_htf_lower_wicks = array.new<line>()
-var int[] all_htf_close_times = array.new<int>()  // ms; estimated for current candle, actual for completed
+var int[] all_htf_close_times = array.new<int>()  // ms; session-aware close, exact from creation
 var bool[] all_htf_is_bullish = array.new<bool>()
 
 // CANDLE RENDERING
@@ -86,25 +97,10 @@ var bool[] all_htf_is_bullish = array.new<bool>()
 // Only render if chart timeframe is less than the higher timeframe
 htf_is_higher = chart_seconds < htf_seconds
 
-if htf_is_higher and new_htf_candle_started
-    // Finalize the previous HTF candle's box - trim to actual end position
-    if not na(visible_candle_body)
-        box.set_right(visible_candle_body, bar_index - 1)
-
-        // Save the previous candle's final wick refs and actual close boundary in arrays
-        last_idx = array.size(all_htf_boxes) - 1
-        if last_idx >= 0
-            array.set(all_htf_upper_wicks, last_idx, upper_shadow_line)
-            array.set(all_htf_lower_wicks, last_idx, lower_shadow_line)
-            // Use the open time of the new bar as the close boundary for the previous candle
-            array.set(all_htf_close_times, last_idx, int(time))
-
-    // Calculate actual bars in the previous HTF period (for markets with non-trading days)
-    if not na(htf_candle_start_bar)
-        bars_per_htf := bar_index - htf_candle_start_bar
-
-    prev_htf_candle_start_bar := htf_candle_start_bar
-    htf_candle_start_bar := bar_index
+if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na(htf_close_time)
+    // The previous candle needs no finalizing: it was drawn to its true close
+    // time from the start, and the update branch below keeps its array entries
+    // current on every bar.
 
     current_htf_open_price := open
     current_htf_high_price := high
@@ -115,12 +111,13 @@ if htf_is_higher and new_htf_candle_started
     current_fill_color := is_bullish ? bullish_fill_color : bearish_fill_color
     current_line_color := is_bullish ? bullish_line_color : bearish_line_color
 
-    // Extend box to where the HTF candle will end (use time-based estimate as fallback for first candle)
-    bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
-    expected_end_bar = math.min(bar_index + bars_estimate - 1, bar_index + 499)
+    // Span the box across the HTF period's real time range. xloc.bar_time is
+    // required here: the right edge sits in the future, and bar_index-based
+    // drawings are capped ~500 bars ahead.
     new_box = box.new(
-         left=bar_index,
-         right=expected_end_bar,
+         left=htf_open_time,
+         right=htf_close_time,
+         xloc=xloc.bar_time,
          top=math.max(current_htf_open_price, current_htf_close_price),
          bottom=math.min(current_htf_open_price, current_htf_close_price),
          bgcolor=current_fill_color,
@@ -130,37 +127,37 @@ if htf_is_higher and new_htf_candle_started
      )
     visible_candle_body := new_box
 
-    // Wick centered in the expected HTF candle range
-    wick_pos = int(math.round((bar_index + expected_end_bar) / 2.0))
+    // Wick centered in the HTF candle's time range
     upper_shadow_line := line.new(
-         x1=wick_pos,
+         x1=htf_mid_time,
          y1=math.max(current_htf_open_price, current_htf_close_price),
-         x2=wick_pos,
+         x2=htf_mid_time,
          y2=current_htf_high_price,
+         xloc=xloc.bar_time,
          color=current_line_color,
          width=line_thickness,
          style=line_style
      )
 
     lower_shadow_line := line.new(
-         x1=wick_pos,
+         x1=htf_mid_time,
          y1=math.min(current_htf_open_price, current_htf_close_price),
-         x2=wick_pos,
+         x2=htf_mid_time,
          y2=current_htf_low_price,
+         xloc=xloc.bar_time,
          color=current_line_color,
          width=line_thickness,
          style=line_style
      )
 
-    // Track new candle in arrays
-    estimated_close_time = int(time) + htf_seconds * 1000
+    // Track new candle in arrays. The close time is exact, so it never needs revising.
     array.push(all_htf_boxes, new_box)
     array.push(all_htf_upper_wicks, upper_shadow_line)
     array.push(all_htf_lower_wicks, lower_shadow_line)
-    array.push(all_htf_close_times, estimated_close_time)
+    array.push(all_htf_close_times, htf_close_time)
     array.push(all_htf_is_bullish, is_bullish)
 
-else if htf_is_higher and not na(htf_candle_start_bar)
+else if htf_is_higher and not na(current_htf_open_price)
     current_htf_high_price := math.max(current_htf_high_price, high)
     current_htf_low_price := math.min(current_htf_low_price, low)
     current_htf_close_price := close
@@ -169,12 +166,9 @@ else if htf_is_higher and not na(htf_candle_start_bar)
     current_fill_color := is_bullish ? bullish_fill_color : bearish_fill_color
     current_line_color := is_bullish ? bullish_line_color : bearish_line_color
 
-    // Calculate expected end bar for box and wick positioning
-    bars_estimate = na(bars_per_htf) ? int(htf_seconds / chart_seconds) : bars_per_htf
-    expected_end_bar = math.min(htf_candle_start_bar + bars_estimate - 1, bar_index + 499)
-
+    // The box's left/right edges are fixed for the whole HTF period; only the
+    // body extent and colour move as price develops.
     if not na(visible_candle_body)
-        box.set_right(visible_candle_body, math.max(bar_index, expected_end_bar))
         box.set_top(visible_candle_body, math.max(current_htf_open_price, current_htf_close_price))
         box.set_bottom(visible_candle_body, math.min(current_htf_open_price, current_htf_close_price))
         box.set_bgcolor(visible_candle_body, current_fill_color)
@@ -185,28 +179,27 @@ else if htf_is_higher and not na(htf_candle_start_bar)
     if not na(lower_shadow_line)
         line.delete(lower_shadow_line)
 
-    // Wick centered in the full HTF candle range
-    wick_center = int(math.round((htf_candle_start_bar + expected_end_bar) / 2.0))
-
     top_price = math.max(current_htf_open_price, current_htf_close_price)
     bottom_price = math.min(current_htf_open_price, current_htf_close_price)
 
     // Always create wicks (they'll be zero-length if high/low equals body edge)
     upper_shadow_line := line.new(
-         x1=wick_center,
+         x1=htf_mid_time,
          y1=top_price,
-         x2=wick_center,
+         x2=htf_mid_time,
          y2=current_htf_high_price,
+         xloc=xloc.bar_time,
          color=current_line_color,
          width=line_thickness,
          style=line_style
      )
 
     lower_shadow_line := line.new(
-         x1=wick_center,
+         x1=htf_mid_time,
          y1=bottom_price,
-         x2=wick_center,
+         x2=htf_mid_time,
          y2=current_htf_low_price,
+         xloc=xloc.bar_time,
          color=current_line_color,
          width=line_thickness,
          style=line_style
@@ -218,8 +211,6 @@ else if htf_is_higher and not na(htf_candle_start_bar)
         array.set(all_htf_upper_wicks, last_idx, upper_shadow_line)
         array.set(all_htf_lower_wicks, last_idx, lower_shadow_line)
         array.set(all_htf_is_bullish, last_idx, is_bullish)
-        int htf_open_time = int(math.round(time[bar_index - htf_candle_start_bar]))
-        array.set(all_htf_close_times, last_idx, htf_open_time + htf_seconds * 1000)
 
 // HIDE/SHOW LOGIC
 //
@@ -267,10 +258,8 @@ format_countdown(seconds) =>
     result += str.tostring(m) + "m"
     result
 
-if htf_is_higher and show_countdown and barstate.islast and not na(htf_candle_start_bar)
+if htf_is_higher and show_countdown and barstate.islast and not na(current_htf_open_price)
     // Calculate time remaining until HTF candle closes
-    int htf_open_time = int(math.round(time[bar_index - htf_candle_start_bar]))
-    int htf_close_time = htf_open_time + htf_seconds * 1000
     int remaining_ms = htf_close_time - timenow
     int remaining_s = int(math.max(0, remaining_ms / 1000))
 
