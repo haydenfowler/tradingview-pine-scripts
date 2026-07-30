@@ -69,13 +69,42 @@ new_htf_candle_started = timeframe.change(higher_timeframe)
 htf_open_time = time(higher_timeframe)
 htf_close_time = time_close(higher_timeframe)
 
-// Midpoint of the HTF period, used to centre the wick.
-htf_mid_time = htf_open_time + int((htf_close_time - htf_open_time) / 2)
-
 var float current_htf_open_price = na
 var float current_htf_high_price = na
 var float current_htf_low_price = na
 var float current_htf_close_price = na
+
+// The wick belongs at the visual centre of the body, which is the middle chart
+// *bar* of the HTF period — not the middle of its time range. The x axis is
+// linear in bars, so any non-trading gap inside the period pulls the two apart.
+// A weekly period swallows a whole weekend: its calendar midpoint falls near
+// Thursday's open, roughly 60% of the way across the five sessions actually
+// drawn. Intraday and daily periods hold no interior gap, which is why only W
+// looked wrong. Bar space is therefore the only honest space for the wick.
+var int htf_start_bar = na
+var int htf_duration_ms = na
+var int prev_htf_bar_count = na
+var int prev_htf_duration_ms = na
+
+// Chart bars the current HTF period is expected to hold. Used only to centre the
+// live candle's wick — completed candles are re-centred exactly once their bar
+// count is known. Scaling the previous period's count by the ratio of durations
+// keeps the estimate honest when consecutive periods differ in length, which is
+// the session-truncated 4H stub case a raw bar count got wrong.
+estimate_period_bars(int prev_count, int prev_ms, int cur_ms) =>
+    int raw = na(prev_count) or na(prev_ms) or prev_ms <= 0 or na(cur_ms)
+         ? int(cur_ms / (chart_seconds * 1000))
+         : int(math.round(prev_count * (cur_ms / float(prev_ms))))
+    math.max(raw, 1)
+
+// Middle bar of a period starting at start_bar. Half of period_bars, not of
+// period_bars - 1: the body runs from the open time — the first bar of the
+// period, at position start_bar — to the close time, which is the first bar of
+// the *next* period at start_bar + period_bars. So it straddles period_bars + 1
+// bar positions and its centre is start_bar + period_bars / 2. Clamped because
+// bar_index-based drawings cannot reach more than 500 bars into the future.
+centre_bar_of(int start_bar, int period_bars) =>
+    math.min(start_bar + int(math.round(period_bars / 2.0)), bar_index + 499)
 
 var box visible_candle_body = na
 var line upper_shadow_line = na
@@ -98,9 +127,28 @@ var bool[] all_htf_is_bullish = array.new<bool>()
 htf_is_higher = chart_seconds < htf_seconds
 
 if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na(htf_close_time)
-    // The previous candle needs no finalizing: it was drawn to its true close
-    // time from the start, and the update branch below keeps its array entries
-    // current on every bar.
+    // The previous candle's box needs no finalizing: it was drawn to its true
+    // close time from the start. Its wick does — until now it sat at an
+    // estimated centre, and the exact bar count has only just become known.
+    if not na(htf_start_bar)
+        closed_bar_count = bar_index - htf_start_bar
+        closed_idx = array.size(all_htf_boxes) - 1
+        if closed_idx >= 0 and closed_bar_count > 0
+            exact_centre = htf_start_bar + int(math.round(closed_bar_count / 2.0))
+            closed_upper = array.get(all_htf_upper_wicks, closed_idx)
+            closed_lower = array.get(all_htf_lower_wicks, closed_idx)
+            if not na(closed_upper)
+                line.set_x1(closed_upper, exact_centre)
+                line.set_x2(closed_upper, exact_centre)
+            if not na(closed_lower)
+                line.set_x1(closed_lower, exact_centre)
+                line.set_x2(closed_lower, exact_centre)
+        prev_htf_bar_count := closed_bar_count
+        prev_htf_duration_ms := htf_duration_ms
+
+    htf_start_bar := bar_index
+    htf_duration_ms := htf_close_time - htf_open_time
+    wick_bar = centre_bar_of(htf_start_bar, estimate_period_bars(prev_htf_bar_count, prev_htf_duration_ms, htf_duration_ms))
 
     current_htf_open_price := open
     current_htf_high_price := high
@@ -127,24 +175,24 @@ if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na
      )
     visible_candle_body := new_box
 
-    // Wick centered in the HTF candle's time range
+    // Wick centered on the middle chart bar of the HTF period
     upper_shadow_line := line.new(
-         x1=htf_mid_time,
+         x1=wick_bar,
          y1=math.max(current_htf_open_price, current_htf_close_price),
-         x2=htf_mid_time,
+         x2=wick_bar,
          y2=current_htf_high_price,
-         xloc=xloc.bar_time,
+         xloc=xloc.bar_index,
          color=current_line_color,
          width=line_thickness,
          style=line_style
      )
 
     lower_shadow_line := line.new(
-         x1=htf_mid_time,
+         x1=wick_bar,
          y1=math.min(current_htf_open_price, current_htf_close_price),
-         x2=htf_mid_time,
+         x2=wick_bar,
          y2=current_htf_low_price,
-         xloc=xloc.bar_time,
+         xloc=xloc.bar_index,
          color=current_line_color,
          width=line_thickness,
          style=line_style
@@ -182,24 +230,26 @@ else if htf_is_higher and not na(current_htf_open_price)
     top_price = math.max(current_htf_open_price, current_htf_close_price)
     bottom_price = math.min(current_htf_open_price, current_htf_close_price)
 
+    wick_bar = centre_bar_of(htf_start_bar, estimate_period_bars(prev_htf_bar_count, prev_htf_duration_ms, htf_duration_ms))
+
     // Always create wicks (they'll be zero-length if high/low equals body edge)
     upper_shadow_line := line.new(
-         x1=htf_mid_time,
+         x1=wick_bar,
          y1=top_price,
-         x2=htf_mid_time,
+         x2=wick_bar,
          y2=current_htf_high_price,
-         xloc=xloc.bar_time,
+         xloc=xloc.bar_index,
          color=current_line_color,
          width=line_thickness,
          style=line_style
      )
 
     lower_shadow_line := line.new(
-         x1=htf_mid_time,
+         x1=wick_bar,
          y1=bottom_price,
-         x2=htf_mid_time,
+         x2=wick_bar,
          y2=current_htf_low_price,
-         xloc=xloc.bar_time,
+         xloc=xloc.bar_index,
          color=current_line_color,
          width=line_thickness,
          style=line_style
