@@ -48,9 +48,10 @@ line_style = line_style_input == "Solid" ? line.style_solid : line_style_input =
 
 // The midline is the candle's equilibrium — (high + low) / 2 of the full HTF
 // range, wicks included. Same definition the prior-day midpoint scripts use.
+// It takes the candle's own bullish/bearish line colour, so the only thing
+// distinguishing it from the body border is its style.
 show_midline = input.bool(true, title="Show Midline",
                           tooltip="Draws the midpoint of each HTF candle's high-low range as a horizontal line spanning the candle.")
-midline_color = input.color(color.new(color.gray, 40), title="Midline Color")
 midline_style_input = input.string("Dashed", title="Midline Style", options=["Solid", "Dashed", "Dotted"])
 midline_style = midline_style_input == "Solid" ? line.style_solid : midline_style_input == "Dashed" ? line.style_dashed : line.style_dotted
 
@@ -221,7 +222,7 @@ if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na
              x2=htf_close_time,
              y2=mid_price,
              xloc=xloc.bar_time,
-             color=midline_color,
+             color=current_line_color,
              width=line_thickness,
              style=midline_style
          )
@@ -289,6 +290,7 @@ else if htf_is_higher and not na(current_htf_open_price)
         mid_price = (current_htf_high_price + current_htf_low_price) / 2
         line.set_y1(midline, mid_price)
         line.set_y2(midline, mid_price)
+        line.set_color(midline, current_line_color)
 
     // Keep current candle's array entry up to date (wicks are deleted/recreated each bar)
     last_idx = array.size(all_htf_boxes) - 1
@@ -320,7 +322,6 @@ if htf_is_higher and barstate.islast
             fill_c   = should_hide ? transparent : (is_bull ? bullish_fill_color : bearish_fill_color)
             border_c = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
             wick_c   = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
-            mid_c    = should_hide ? transparent : midline_color
 
             if not na(b)
                 box.set_bgcolor(b, fill_c)
@@ -330,7 +331,7 @@ if htf_is_higher and barstate.islast
             if not na(l)
                 line.set_color(l, wick_c)
             if not na(m)
-                line.set_color(m, mid_c)
+                line.set_color(m, wick_c)
 
 // COUNTDOWN TIMER
 

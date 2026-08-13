@@ -11,7 +11,7 @@ Displays higher timeframe candles overlaid on your current chart. Useful for see
 - Auto-selects the next higher timeframe, or choose manually
 - Customizable colors for bullish/bearish candles
 - Adjustable line thickness and style
-- Optional midline per candle — `(high + low) / 2` of the HTF range, with its own colour and style
+- Optional midline per candle — `(high + low) / 2` of the HTF range, in the candle's own bull/bear colour
 - Projects incomplete HTF candles to their expected width
 
 Note: TradingView caps an indicator at 500 lines. Each candle uses two (the wicks), or three with
