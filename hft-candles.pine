@@ -46,6 +46,14 @@ line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
 line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"])
 line_style = line_style_input == "Solid" ? line.style_solid : line_style_input == "Dashed" ? line.style_dashed : line.style_dotted
 
+// The midline is the candle's equilibrium — (high + low) / 2 of the full HTF
+// range, wicks included. Same definition the prior-day midpoint scripts use.
+show_midline = input.bool(true, title="Show Midline",
+                          tooltip="Draws the midpoint of each HTF candle's high-low range as a horizontal line spanning the candle.")
+midline_color = input.color(color.new(color.gray, 40), title="Midline Color")
+midline_style_input = input.string("Dashed", title="Midline Style", options=["Solid", "Dashed", "Dotted"])
+midline_style = midline_style_input == "Solid" ? line.style_solid : midline_style_input == "Dashed" ? line.style_dashed : line.style_dotted
+
 show_countdown = input.bool(true, title="Show Countdown Timer")
 countdown_color = input.color(color.white, title="Countdown Text Color")
 countdown_position_input = input.string("Middle", title="Countdown Position", options=["Top", "Middle", "Bottom"])
@@ -109,6 +117,7 @@ centre_bar_of(int start_bar, int period_bars) =>
 var box visible_candle_body = na
 var line upper_shadow_line = na
 var line lower_shadow_line = na
+var line midline = na
 
 var color current_fill_color = na
 var color current_line_color = na
@@ -118,6 +127,7 @@ var label countdown_label = na
 var box[] all_htf_boxes = array.new<box>()
 var line[] all_htf_upper_wicks = array.new<line>()
 var line[] all_htf_lower_wicks = array.new<line>()
+var line[] all_htf_midlines = array.new<line>()  // na entries when the midline is disabled
 var int[] all_htf_close_times = array.new<int>()  // ms; session-aware close, exact from creation
 var bool[] all_htf_is_bullish = array.new<bool>()
 
@@ -198,10 +208,30 @@ if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na
          style=line_style
      )
 
+    // Midline spans the candle's real time range, like the box — its x edges are
+    // fixed for the whole period, so only its price level moves as the range
+    // develops. That is why it is updated in place rather than redrawn like the
+    // wicks, whose centre bar shifts.
+    line new_midline = na
+    if show_midline
+        mid_price = (current_htf_high_price + current_htf_low_price) / 2
+        new_midline := line.new(
+             x1=htf_open_time,
+             y1=mid_price,
+             x2=htf_close_time,
+             y2=mid_price,
+             xloc=xloc.bar_time,
+             color=midline_color,
+             width=line_thickness,
+             style=midline_style
+         )
+    midline := new_midline
+
     // Track new candle in arrays. The close time is exact, so it never needs revising.
     array.push(all_htf_boxes, new_box)
     array.push(all_htf_upper_wicks, upper_shadow_line)
     array.push(all_htf_lower_wicks, lower_shadow_line)
+    array.push(all_htf_midlines, new_midline)
     array.push(all_htf_close_times, htf_close_time)
     array.push(all_htf_is_bullish, is_bullish)
 
@@ -255,6 +285,11 @@ else if htf_is_higher and not na(current_htf_open_price)
          style=line_style
      )
 
+    if not na(midline)
+        mid_price = (current_htf_high_price + current_htf_low_price) / 2
+        line.set_y1(midline, mid_price)
+        line.set_y2(midline, mid_price)
+
     // Keep current candle's array entry up to date (wicks are deleted/recreated each bar)
     last_idx = array.size(all_htf_boxes) - 1
     if last_idx >= 0
@@ -278,12 +313,14 @@ if htf_is_higher and barstate.islast
             is_bull = array.get(all_htf_is_bullish, i)
             u = array.get(all_htf_upper_wicks, i)
             l = array.get(all_htf_lower_wicks, i)
+            m = array.get(all_htf_midlines, i)
 
             should_hide = hide_incomplete and (not na(chart.right_visible_bar_time)) and (close_time > chart.right_visible_bar_time)
 
             fill_c   = should_hide ? transparent : (is_bull ? bullish_fill_color : bearish_fill_color)
             border_c = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
             wick_c   = should_hide ? transparent : (is_bull ? bullish_line_color  : bearish_line_color)
+            mid_c    = should_hide ? transparent : midline_color
 
             if not na(b)
                 box.set_bgcolor(b, fill_c)
@@ -292,6 +329,8 @@ if htf_is_higher and barstate.islast
                 line.set_color(u, wick_c)
             if not na(l)
                 line.set_color(l, wick_c)
+            if not na(m)
+                line.set_color(m, mid_c)
 
 // COUNTDOWN TIMER
 
