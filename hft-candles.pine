@@ -5,6 +5,10 @@ indicator("HTF Candles", overlay=true, explicit_plot_zorder=true, max_lines_coun
 
 // USER SETTINGS
 
+// Every input below carries display=display.none so it stays out of the chart's
+// status line, which otherwise lists all thirteen of them after the indicator
+// name. The timeframe is the only one worth reading there, so it is the only one
+// left on display.
 higher_timeframe_input = input.string("Auto", title="Higher Timeframe",
                                   options=["Auto", "1m", "5m", "15m", "30m", "1h", "4h", "D", "W", "M"],
                                   tooltip="Select 'Auto' to automatically use one timeframe higher than the chart, or choose a specific timeframe")
@@ -38,34 +42,40 @@ higher_timeframe = higher_timeframe_input == "Auto" ? get_next_higher_timeframe(
 
 // Pine takes transparency, TradingView's picker shows opacity — these are the
 // complements of 5% / 35% / 4% / 30% opacity respectively.
-bullish_fill_color = input.color(color.new(color.green, 95), title="Bullish Fill Color")
-bullish_line_color = input.color(color.new(color.green, 65), title="Bullish Line Color")
-bearish_fill_color = input.color(color.new(color.red, 96), title="Bearish Fill Color")
-bearish_line_color = input.color(color.new(color.rgb(255,120,120), 70), title="Bearish Line Color")
-line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10)
-line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"])
+bullish_fill_color = input.color(color.new(color.green, 95), title="Bullish Fill Color", display=display.none)
+bullish_line_color = input.color(color.new(color.green, 65), title="Bullish Line Color", display=display.none)
+bearish_fill_color = input.color(color.new(color.red, 96), title="Bearish Fill Color", display=display.none)
+bearish_line_color = input.color(color.new(color.rgb(255,120,120), 70), title="Bearish Line Color", display=display.none)
+line_thickness = input.int(1, title="Line Thickness", minval=1, maxval=10, display=display.none)
+line_style_input = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"], display=display.none)
 line_style = line_style_input == "Solid" ? line.style_solid : line_style_input == "Dashed" ? line.style_dashed : line.style_dotted
 
 // The midline is the candle's equilibrium — (high + low) / 2 of the full HTF
 // range, wicks included. Same definition the prior-day midpoint scripts use.
 // It takes the candle's own bullish/bearish line colour, so the only thing
 // distinguishing it from the body border is its style.
-show_midline = input.bool(true, title="Show Midline",
+show_midline = input.bool(true, title="Show Midline", display=display.none,
                           tooltip="Draws the midpoint of each HTF candle's high-low range as a horizontal line spanning the candle.")
-midline_style_input = input.string("Dashed", title="Midline Style", options=["Solid", "Dashed", "Dotted"])
+midline_style_input = input.string("Dashed", title="Midline Style", options=["Solid", "Dashed", "Dotted"], display=display.none)
 midline_style = midline_style_input == "Solid" ? line.style_solid : midline_style_input == "Dashed" ? line.style_dashed : line.style_dotted
 
-show_countdown = input.bool(true, title="Show Countdown Timer")
-countdown_color = input.color(color.white, title="Countdown Text Color")
-countdown_position_input = input.string("Middle", title="Countdown Position", options=["Top", "Middle", "Bottom"])
+show_countdown = input.bool(false, title="Show Countdown Timer", display=display.none)
+countdown_color = input.color(color.white, title="Countdown Text Color", display=display.none)
+countdown_position_input = input.string("Middle", title="Countdown Position", options=["Top", "Middle", "Bottom"], display=display.none)
 
-hide_incomplete = input.bool(false, title="Hide candles extending beyond view",
+hide_incomplete = input.bool(false, title="Hide candles extending beyond view", display=display.none,
                              tooltip="Hides HTF candles whose close has not yet passed the right edge of the visible chart. Useful for manual backtesting by scrolling — prevents seeing future candle close prices.")
 
 // VARIABLES
 
 htf_seconds = timeframe.in_seconds(higher_timeframe)
 chart_seconds = timeframe.in_seconds()
+
+// An intraday HTF period is contiguous trading time, so the chart projects one
+// empty slot per chart interval across the part of it that has not happened
+// yet. Daily and above straddle overnight and weekend closures the chart never
+// draws, so wall-clock time cannot be converted to slots there.
+htf_is_intraday = htf_seconds < 86400
 
 new_htf_candle_started = timeframe.change(higher_timeframe)
 
@@ -85,19 +95,24 @@ var float current_htf_close_price = na
 
 // The wick belongs at the visual centre of the body, which is the middle chart
 // *bar* of the HTF period — not the middle of its time range. The x axis is
-// linear in bars, so any non-trading gap inside the period pulls the two apart.
-// A weekly period swallows a whole weekend: its calendar midpoint falls near
-// Thursday's open, roughly 60% of the way across the five sessions actually
-// drawn. Intraday and daily periods hold no interior gap, which is why only W
-// looked wrong. Bar space is therefore the only honest space for the wick.
+// linear in bars, so any gap inside the period pulls the two apart.
+//
+// Two kinds of gap do this. A weekly period swallows a whole weekend: its
+// calendar midpoint falls near Thursday's open, roughly 60% of the way across
+// the five sessions actually drawn. And on any timeframe, a symbol that goes
+// untraded for an interval gets no bar for it at all — a thin instrument can
+// drop a quarter of its minutes inside a single hour. Bar space is therefore
+// the only honest space for the wick, on every HTF, not just W.
 var int htf_start_bar = na
 var int htf_duration_ms = na
 var int prev_htf_bar_count = na
 var int prev_htf_duration_ms = na
 
 // Chart bars the current HTF period is expected to hold. Used only to centre the
-// live candle's wick — completed candles are re-centred exactly once their bar
-// count is known. Scaling the previous period's count by the ratio of durations
+// live candle's wick on a daily-or-higher HTF, where the remaining span crosses
+// closures the chart does not draw and so cannot be projected from the clock.
+// Completed candles are re-centred exactly once their bar count is known.
+// Scaling the previous period's count by the ratio of durations
 // keeps the estimate honest when consecutive periods differ in length, which is
 // the session-truncated 4H stub case a raw bar count got wrong.
 estimate_period_bars(int prev_count, int prev_ms, int cur_ms) =>
@@ -106,14 +121,37 @@ estimate_period_bars(int prev_count, int prev_ms, int cur_ms) =>
          : int(math.round(prev_count * (cur_ms / float(prev_ms))))
     math.max(raw, 1)
 
-// Middle bar of a period starting at start_bar. Half of period_bars, not of
-// period_bars - 1: the body runs from the open time — the first bar of the
-// period, at position start_bar — to the close time, which is the first bar of
-// the *next* period at start_bar + period_bars. So it straddles period_bars + 1
-// bar positions and its centre is start_bar + period_bars / 2. Clamped because
-// bar_index-based drawings cannot reach more than 500 bars into the future.
-centre_bar_of(int start_bar, int period_bars) =>
-    math.min(start_bar + int(math.round(period_bars / 2.0)), bar_index + 499)
+// Middle bar of the live candle, in the bar space the body is actually drawn in.
+//
+// The body's two edges resolve differently and cannot be averaged in clock time.
+// Its left edge is a real bar at start_bar. Its right edge is a timestamp in the
+// future, which the chart projects at one slot per chart interval. The elapsed
+// half is therefore however many bars actually *printed* — a symbol with no
+// trades in a given minute gets no bar for it, so that half is narrower than the
+// clock says — while the projected half is always full density.
+//
+// Measuring the elapsed half rather than predicting it also makes this
+// self-correcting: every new bar re-reads the real count, so the wick converges
+// on the true centre instead of inheriting the previous period's error.
+//
+// Half of the span, not of span - 1: the body runs from the open time, at
+// start_bar, to the close time, which is the first slot of the *next* period.
+// So it straddles span + 1 positions and its centre is start_bar + span / 2.
+//
+// An odd span has no bar at that centre — a 5m period on a 1m chart holds bars
+// at offsets 0..4 and wants offset 2.5 — so the half has to be truncated, not
+// rounded. Rounding breaks every such tie upward and lands the wick a full bar
+// right of the period's middle bar, which is the whole of why a 5m candle's wick
+// printed on its 4th bar. int() truncates toward zero and both spans here are
+// non-negative, so it floors.
+//
+// Clamped because bar_index drawings cannot reach past 500 bars into the future.
+live_centre_bar(int start_bar) =>
+    int remaining = htf_is_intraday
+         ? int(math.round((htf_close_time - time) / (chart_seconds * 1000.0)))
+         : math.max(estimate_period_bars(prev_htf_bar_count, prev_htf_duration_ms, htf_duration_ms) - (bar_index - start_bar), 0)
+    int right_bar = bar_index + math.max(remaining, 0)
+    math.min(start_bar + int((right_bar - start_bar) / 2.0), bar_index + 499)
 
 var box visible_candle_body = na
 var line upper_shadow_line = na
@@ -145,7 +183,10 @@ if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na
         closed_bar_count = bar_index - htf_start_bar
         closed_idx = array.size(all_htf_boxes) - 1
         if closed_idx >= 0 and closed_bar_count > 0
-            exact_centre = htf_start_bar + int(math.round(closed_bar_count / 2.0))
+            // Truncated, not rounded, for the same reason as live_centre_bar:
+            // an odd bar count has no centre bar and rounding always biases the
+            // wick a bar to the right.
+            exact_centre = htf_start_bar + int(closed_bar_count / 2.0)
             closed_upper = array.get(all_htf_upper_wicks, closed_idx)
             closed_lower = array.get(all_htf_lower_wicks, closed_idx)
             if not na(closed_upper)
@@ -159,7 +200,7 @@ if htf_is_higher and new_htf_candle_started and not na(htf_open_time) and not na
 
     htf_start_bar := bar_index
     htf_duration_ms := htf_close_time - htf_open_time
-    wick_bar = centre_bar_of(htf_start_bar, estimate_period_bars(prev_htf_bar_count, prev_htf_duration_ms, htf_duration_ms))
+    wick_bar = live_centre_bar(htf_start_bar)
 
     current_htf_open_price := open
     current_htf_high_price := high
@@ -261,7 +302,7 @@ else if htf_is_higher and not na(current_htf_open_price)
     top_price = math.max(current_htf_open_price, current_htf_close_price)
     bottom_price = math.min(current_htf_open_price, current_htf_close_price)
 
-    wick_bar = centre_bar_of(htf_start_bar, estimate_period_bars(prev_htf_bar_count, prev_htf_duration_ms, htf_duration_ms))
+    wick_bar = live_centre_bar(htf_start_bar)
 
     // Always create wicks (they'll be zero-length if high/low equals body edge)
     upper_shadow_line := line.new(
